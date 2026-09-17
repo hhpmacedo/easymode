@@ -1,0 +1,22 @@
+[
+  { "prompt": "hi", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "thanks!", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "make this uppercase: hello world", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "what's the capital of Australia?", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "rewrite this sentence to sound more formal: gonna need that report asap", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "summarize the plot of Moby Dick in three paragraphs", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "explain how HTTPS works to a junior developer", "expected": ["claude-sonnet-5"] },
+  { "prompt": "write a Python function that parses a CSV and returns rows grouped by a column", "expected": ["claude-sonnet-5"] },
+  { "prompt": "what are the tradeoffs between SQL and NoSQL databases for an e-commerce site?", "expected": ["claude-sonnet-5", "claude-opus-4-8"] },
+  { "prompt": "draft a friendly email declining a meeting invitation", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "I have a race condition in my async Python code where two coroutines both read a counter, increment it, and write it back, and under load the count is wrong even though I added a lock around the write. Walk me through what's happening and how to fix it properly.", "expected": ["claude-opus-4-8", "claude-sonnet-5"] },
+  { "prompt": "design a database schema and API surface for a multi-tenant SaaS invoicing system with usage-based billing, proration, and dunning. Explain the key tradeoffs you made.", "expected": ["claude-opus-4-8", "claude-fable-5"] },
+  { "prompt": "review this architecture: we sync data between two eventually-consistent stores using a CDC pipeline, but consumers sometimes see deletes before the corresponding creates. Propose ordering guarantees and failure-mode analysis for exactly-once semantics across both stores.", "expected": ["claude-opus-4-8", "claude-fable-5"] },
+  { "prompt": "prove that the halting problem is undecidable, then explain how Rice's theorem generalizes it, with rigorous definitions throughout", "expected": ["claude-opus-4-8", "claude-fable-5"] },
+  { "prompt": "why is the sky blue?", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "translate 'good morning' to Portuguese", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "write a haiku about coffee", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
+  { "prompt": "compare Kubernetes operators vs Helm charts for managing stateful workloads, with concrete failure scenarios", "expected": ["claude-sonnet-5", "claude-opus-4-8"] },
+  { "prompt": "fix this: TypeError: Cannot read properties of undefined (reading 'map') in my React component when data loads", "expected": ["claude-sonnet-5"] },
+  { "prompt": "outline a step-by-step migration plan to move a 2M-line monolith to microservices over 18 months without a feature freeze, including org design, strangler-fig sequencing, data ownership splits, and rollback strategy for each phase", "expected": ["claude-opus-4-8", "claude-fable-5"] }
+]
