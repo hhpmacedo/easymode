@@ -7,6 +7,13 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # typescript-eslint doesn't support TS 7 yet; eslint 10 needs config
+      # migration in eslint-config-next. Both bumps fail CI — revisit later.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
