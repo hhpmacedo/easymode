@@ -16,7 +16,9 @@ interface Props {
 
 export function MessageList({ messages, status, error, onRetry }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, status]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, status]);
 
   // The raw user text preceding each assistant message (for the reveal diff).
   const rawBefore = (i: number): string => {
