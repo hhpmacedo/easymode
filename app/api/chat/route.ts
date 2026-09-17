@@ -25,7 +25,8 @@ export async function POST(req: Request) {
     );
     routing = { ...decision, finalModel: model, guardrailApplied: applied, fallback: false };
     classifierUsage = usage;
-  } catch {
+  } catch (err) {
+    console.error("[easymode] classifier failed:", err);
     routing = {
       taskType: "unknown",
       complexity: "everyday",
@@ -70,6 +71,14 @@ export async function POST(req: Request) {
 
   // 3. Metadata rides the UI message stream: routing at start, usage at finish.
   return result.toUIMessageStreamResponse({
+    // Default AI SDK behavior masks every stream error as "An error occurred.",
+    // which makes failures (bad key, overload, network) undiagnosable from the
+    // UI. Log the full error server-side and surface a terse cause client-side.
+    onError: (error) => {
+      console.error("[easymode] answer stream failed:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      return `Model call failed: ${message.slice(0, 200)}`;
+    },
     messageMetadata: ({ part }): EasyMetadata | undefined => {
       if (part.type === "start") return { routing, classifierUsage };
       if (part.type === "finish") {
