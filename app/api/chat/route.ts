@@ -1,6 +1,6 @@
 import { streamText } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
-import { classify, applyGuardrail } from "@/lib/router";
+import { classify, applyGuardrail, priorTier } from "@/lib/router";
 import { buildModelMessages, latestUserText } from "@/lib/history";
 import { DEFAULT_FALLBACK_MODEL } from "@/lib/pricing";
 import type { EasyMetadata, EasyUIMessage, RoutingDecision, TokenUsage } from "@/lib/types";
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   let classifierUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const { decision, usage } = await classify(history, rawText);
-    const { model, applied } = applyGuardrail(decision.chosenModel, decision.complexity, rawText);
+    const { model, applied } = applyGuardrail(decision.chosenModel, decision.complexity, rawText, priorTier(history));
     routing = { ...decision, finalModel: model, guardrailApplied: applied, fallback: false };
     classifierUsage = usage;
   } catch {
@@ -40,16 +40,22 @@ export async function POST(req: Request) {
       messages: buildModelMessages(messages, routing.optimizedPrompt),
     });
 
-  let result;
-  try {
-    result = run(routing.finalModel);
-  } catch {
-    // Pre-stream failure on Fable (e.g. refusal/availability): one retry on Opus (spec §8).
-    if (routing.finalModel === "claude-fable-5") {
+  let result = run(routing.finalModel);
+
+  // Fable refusal/availability: one retry on Opus 4.8 (spec §3.3 / §8). streamText
+  // never throws — a refusal surfaces as finishReason "content-filter" (Anthropic
+  // stop_reason "refusal") and API/network failures reject the finishReason promise,
+  // so await completion (the result stream is buffered and replayable) and retry.
+  if (routing.finalModel === "claude-fable-5") {
+    let declined = false;
+    try {
+      declined = (await result.finishReason) === "content-filter";
+    } catch {
+      declined = true; // stream error (e.g. overloaded/unavailable)
+    }
+    if (declined) {
       routing = { ...routing, finalModel: "claude-opus-4-8", reasoning: routing.reasoning + " (Fable declined — retried on Opus 4.8.)" };
       result = run("claude-opus-4-8");
-    } else {
-      throw new Error("Model call failed");
     }
   }
 

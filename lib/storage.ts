@@ -54,7 +54,11 @@ export class ConversationStore {
   }
 
   saveMessages(id: string, messages: EasyUIMessage[]): void {
-    this.storage.setItem(msgKey(id), JSON.stringify(messages));
+    const json = JSON.stringify(messages);
+    // No-op when nothing changed (e.g. re-mount on conversation switch) so
+    // updatedAt — and thus sidebar order — only moves on real updates.
+    if (this.storage.getItem(msgKey(id)) === json) return;
+    this.storage.setItem(msgKey(id), json);
     const index = this.readIndex();
     const meta = index.find((c) => c.id === id);
     if (!meta) return;

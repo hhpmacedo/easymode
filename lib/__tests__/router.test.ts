@@ -32,6 +32,16 @@ describe("applyGuardrail", () => {
     expect(applyGuardrail("claude-fable-5", "exceptional", MID20).model).toBe("claude-opus-4-8");
     expect(applyGuardrail("claude-fable-5", "exceptional", HARD60).model).toBe("claude-fable-5");
   });
+  it("does not drop a short follow-up below the prior tier (criterion 3)", () => {
+    // "now make it faster" after a hard/Opus task: cap must not undercut Opus.
+    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster", "claude-opus-4-8")).toEqual({
+      model: "claude-opus-4-8", applied: false,
+    });
+    // Without a prior tier the cap still applies.
+    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster").model).toBe("claude-sonnet-5");
+    // A prior tier at/below Sonnet does not weaken the cap.
+    expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT, "claude-haiku-4-5").model).toBe("claude-sonnet-5");
+  });
   it("leaves valid choices untouched", () => {
     expect(applyGuardrail("claude-sonnet-5", "everyday", "summarize the article I pasted below please: " + LONG)).toEqual({
       model: "claude-sonnet-5", applied: false,

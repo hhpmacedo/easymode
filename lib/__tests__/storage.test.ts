@@ -36,6 +36,17 @@ describe("ConversationStore", () => {
     expect(store.list()[0].title).toBe("hello world this is a longer messag…");
   });
 
+  it("does not bump updatedAt when saving unchanged messages", () => {
+    const a = store.create();
+    const b = store.create();
+    store.saveMessages(a.id, [msg]);
+    const savedAt = store.list().find((c) => c.id === a.id)!.updatedAt;
+    store.saveMessages(b.id, [msg]); // b is now the most recently updated
+    store.saveMessages(a.id, [msg]); // unchanged content → no-op
+    expect(store.list().find((c) => c.id === a.id)!.updatedAt).toBe(savedAt);
+    expect(store.list()[0].id).toBe(b.id);
+  });
+
   it("renames and deletes", () => {
     const c = store.create();
     store.rename(c.id, "My chat");

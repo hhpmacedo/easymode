@@ -21,20 +21,25 @@ function hasCode(text: string): boolean {
 }
 
 /** Deterministic post-LLM guardrail. Pure; unit-tested. Only moves the choice
- *  within the pool — never invents a model. */
+ *  within the pool — never invents a model. `priorModel` is the tier of the
+ *  turn this message continues (follow-up inheritance, acceptance criterion 3). */
 export function applyGuardrail(
   chosen: ModelId,
   complexity: Complexity,
   rawText: string,
+  priorModel?: ModelId,
 ): { model: ModelId; applied: boolean } {
   const words = countWords(rawText);
   const code = hasCode(rawText);
   const questions = (rawText.match(/\?/g) ?? []).length;
   let model = chosen;
 
-  // Cap: tiny, code-free, single-question messages never need Opus/Fable.
-  if (words < 15 && !code && questions < 2 && RANK[model] > RANK["claude-sonnet-5"]) {
-    model = "claude-sonnet-5";
+  // Cap: tiny, code-free, single-question messages never need Opus/Fable —
+  // but a follow-up never drops below the tier of the task it continues.
+  const cap: ModelId =
+    priorModel && RANK[priorModel] > RANK["claude-sonnet-5"] ? priorModel : "claude-sonnet-5";
+  if (words < 15 && !code && questions < 2 && RANK[model] > RANK[cap]) {
+    model = cap;
   }
   // Floor: code or long messages never go to Haiku.
   if ((code || words > 300) && RANK[model] < RANK["claude-sonnet-5"]) {
@@ -68,6 +73,17 @@ For each new user message you do two jobs:
 - exceptional → claude-fable-5: RARE. Only genuinely demanding long-horizon reasoning.
 
 Follow-up rule: a follow-up message ("yes do that", "now make it faster") inherits AT LEAST the tier of the task it continues, unless it is a clear topic switch. Use the conversation context provided.`;
+
+/** Tier of the most recent routed assistant turn — what a follow-up inherits. */
+export function priorTier(history: EasyUIMessage[]): ModelId | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role !== "assistant") continue;
+    const model = m.metadata?.routing?.finalModel;
+    if (model) return model;
+  }
+  return undefined;
+}
 
 /** Build classifier input: last 4 turns (truncated) + the new message. */
 export function buildClassifierPrompt(history: EasyUIMessage[], rawText: string): string {
