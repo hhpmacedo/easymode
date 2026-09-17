@@ -1,7 +1,10 @@
 import { readFileSync } from "fs";
 import { classify, applyGuardrail } from "../lib/router";
 
-interface Case { prompt: string; expected: string[]; }
+interface Case {
+  prompt: string;
+  expected: string[];
+}
 
 async function main() {
   const cases: Case[] = JSON.parse(readFileSync("fixtures/routing-eval.json", "utf8"));
@@ -12,7 +15,9 @@ async function main() {
       const { model } = applyGuardrail(decision.chosenModel, decision.complexity, c.prompt);
       const ok = c.expected.includes(model);
       if (ok) pass++;
-      console.log(`${ok ? "✅" : "❌"} [${model}] (llm: ${decision.chosenModel}, ${decision.complexity}) ${c.prompt.slice(0, 60)}`);
+      console.log(
+        `${ok ? "✅" : "❌"} [${model}] (llm: ${decision.chosenModel}, ${decision.complexity}) ${c.prompt.slice(0, 60)}`,
+      );
     } catch (e) {
       console.log(`💥 ${c.prompt.slice(0, 60)} — ${(e as Error).message}`);
     }

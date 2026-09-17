@@ -10,17 +10,23 @@ function fakeStorage(): Storage {
     removeItem: (k) => void map.delete(k),
     clear: () => map.clear(),
     key: (i) => [...map.keys()][i] ?? null,
-    get length() { return map.size; },
+    get length() {
+      return map.size;
+    },
   } as Storage;
 }
 
 const msg: EasyUIMessage = {
-  id: "m1", role: "user", parts: [{ type: "text", text: "hello world this is a longer message" }],
+  id: "m1",
+  role: "user",
+  parts: [{ type: "text", text: "hello world this is a longer message" }],
 } as EasyUIMessage;
 
 describe("ConversationStore", () => {
   let store: ConversationStore;
-  beforeEach(() => { store = new ConversationStore(fakeStorage()); });
+  beforeEach(() => {
+    store = new ConversationStore(fakeStorage());
+  });
 
   it("creates and lists conversations, newest first", () => {
     const a = store.create();

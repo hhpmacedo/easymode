@@ -17,7 +17,12 @@ export async function POST(req: Request) {
   let classifierUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const { decision, usage } = await classify(history, rawText);
-    const { model, applied } = applyGuardrail(decision.chosenModel, decision.complexity, rawText, priorTier(history));
+    const { model, applied } = applyGuardrail(
+      decision.chosenModel,
+      decision.complexity,
+      rawText,
+      priorTier(history),
+    );
     routing = { ...decision, finalModel: model, guardrailApplied: applied, fallback: false };
     classifierUsage = usage;
   } catch {
@@ -54,7 +59,11 @@ export async function POST(req: Request) {
       declined = true; // stream error (e.g. overloaded/unavailable)
     }
     if (declined) {
-      routing = { ...routing, finalModel: "claude-opus-4-8", reasoning: routing.reasoning + " (Fable declined — retried on Opus 4.8.)" };
+      routing = {
+        ...routing,
+        finalModel: "claude-opus-4-8",
+        reasoning: routing.reasoning + " (Fable declined — retried on Opus 4.8.)",
+      };
       result = run("claude-opus-4-8");
     }
   }

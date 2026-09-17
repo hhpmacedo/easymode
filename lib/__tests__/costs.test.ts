@@ -30,7 +30,11 @@ describe("turnCosts", () => {
     expect(t.savings).toBeLessThan(0);
   });
   it("savingsPct is 0 when baseline is 0", () => {
-    const t = turnCosts("claude-haiku-4-5", { inputTokens: 0, outputTokens: 0 }, { inputTokens: 0, outputTokens: 0 });
+    const t = turnCosts(
+      "claude-haiku-4-5",
+      { inputTokens: 0, outputTokens: 0 },
+      { inputTokens: 0, outputTokens: 0 },
+    );
     expect(t.savingsPct).toBe(0);
   });
 });

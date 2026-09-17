@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { applyGuardrail } from "../router";
 
-const SHORT = "hello there friend";                          // 3 words, no code
-const LONG = Array(320).fill("word").join(" ");              // >300 words
+const SHORT = "hello there friend"; // 3 words, no code
+const LONG = Array(320).fill("word").join(" "); // >300 words
 const CODE = "why does this fail?\n```js\nconst x = 1;\n```";
-const HARD60 = Array(60).fill("analyze").join(" ");          // >50 words
-const MID20 = Array(20).fill("ponder").join(" ");            // 15–50 words, no code
+const HARD60 = Array(60).fill("analyze").join(" "); // >50 words
+const MID20 = Array(20).fill("ponder").join(" "); // 15–50 words, no code
 
 describe("applyGuardrail", () => {
   it("caps short non-code messages at Sonnet", () => {
     expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT)).toEqual({
-      model: "claude-sonnet-5", applied: true,
+      model: "claude-sonnet-5",
+      applied: true,
     });
     expect(applyGuardrail("claude-fable-5", "exceptional", SHORT).model).toBe("claude-sonnet-5");
   });
@@ -20,7 +21,8 @@ describe("applyGuardrail", () => {
   });
   it("floors code-bearing messages at Sonnet", () => {
     expect(applyGuardrail("claude-haiku-4-5", "trivial", CODE)).toEqual({
-      model: "claude-sonnet-5", applied: true,
+      model: "claude-sonnet-5",
+      applied: true,
     });
   });
   it("floors >300-word messages at Sonnet", () => {
@@ -34,17 +36,31 @@ describe("applyGuardrail", () => {
   });
   it("does not drop a short follow-up below the prior tier (criterion 3)", () => {
     // "now make it faster" after a hard/Opus task: cap must not undercut Opus.
-    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster", "claude-opus-4-8")).toEqual({
-      model: "claude-opus-4-8", applied: false,
+    expect(
+      applyGuardrail("claude-opus-4-8", "hard", "now make it faster", "claude-opus-4-8"),
+    ).toEqual({
+      model: "claude-opus-4-8",
+      applied: false,
     });
     // Without a prior tier the cap still applies.
-    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster").model).toBe("claude-sonnet-5");
+    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster").model).toBe(
+      "claude-sonnet-5",
+    );
     // A prior tier at/below Sonnet does not weaken the cap.
-    expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT, "claude-haiku-4-5").model).toBe("claude-sonnet-5");
+    expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT, "claude-haiku-4-5").model).toBe(
+      "claude-sonnet-5",
+    );
   });
   it("leaves valid choices untouched", () => {
-    expect(applyGuardrail("claude-sonnet-5", "everyday", "summarize the article I pasted below please: " + LONG)).toEqual({
-      model: "claude-sonnet-5", applied: false,
+    expect(
+      applyGuardrail(
+        "claude-sonnet-5",
+        "everyday",
+        "summarize the article I pasted below please: " + LONG,
+      ),
+    ).toEqual({
+      model: "claude-sonnet-5",
+      applied: false,
     });
   });
 });

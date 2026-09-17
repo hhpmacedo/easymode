@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
-:root { color-scheme: dark; }
-body { @apply bg-zinc-950 text-zinc-100 antialiased; }
+:root {
+  color-scheme: dark;
+}
+body {
+  @apply bg-zinc-950 text-zinc-100 antialiased;
+}

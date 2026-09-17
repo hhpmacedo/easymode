@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # Live checks cost real API money: main pushes + manual runs only, and
+  # every step degrades to a skip when the secret isn't configured.
+  live-checks:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Routing eval (20 prompts vs live classifier)
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::No ANTHROPIC_API_KEY secret - skipping eval"; exit 0; fi
+          npm run eval
+      - name: E2E smoke
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::No ANTHROPIC_API_KEY secret - skipping e2e"; exit 0; fi
+          npx playwright install --with-deps chromium
+          npx playwright test

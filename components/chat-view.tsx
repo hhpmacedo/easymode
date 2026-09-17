@@ -53,9 +53,12 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         <h1 className="text-sm font-semibold text-zinc-300">EasyMode</h1>
         {messages.some((m) => m.role === "assistant") && (
           <span className="text-xs text-zinc-400">
-            This conversation: <strong className={total.savings >= 0 ? "text-emerald-400" : "text-amber-400"}>
-              {total.savings >= 0 ? "saved" : "premium"} {formatUSD(Math.abs(total.savings))} (~{Math.abs(total.pct).toFixed(0)}%)
-            </strong> vs always-Opus · est.
+            This conversation:{" "}
+            <strong className={total.savings >= 0 ? "text-emerald-400" : "text-amber-400"}>
+              {total.savings >= 0 ? "saved" : "premium"} {formatUSD(Math.abs(total.savings))} (~
+              {Math.abs(total.pct).toFixed(0)}%)
+            </strong>{" "}
+            vs always-Opus · est.
           </span>
         )}
       </header>

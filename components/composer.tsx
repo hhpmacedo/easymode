@@ -1,7 +1,13 @@
 "use client";
 import { useState } from "react";
 
-export function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+export function Composer({
+  disabled,
+  onSend,
+}: {
+  disabled: boolean;
+  onSend: (text: string) => void;
+}) {
   const [text, setText] = useState("");
   const submit = () => {
     const t = text.trim();
@@ -16,7 +22,10 @@ export function Composer({ disabled, onSend }: { disabled: boolean; onSend: (tex
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
           }}
           rows={Math.min(6, text.split("\n").length)}
           placeholder="Ask anything — we'll handle the prompting."

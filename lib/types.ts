@@ -19,12 +19,12 @@ export interface TokenUsage {
 export interface RoutingDecision {
   taskType: string;
   complexity: Complexity;
-  chosenModel: ModelId;      // classifier's pick
-  finalModel: ModelId;       // after guardrail
+  chosenModel: ModelId; // classifier's pick
+  finalModel: ModelId; // after guardrail
   guardrailApplied: boolean;
   reasoning: string;
   optimizedPrompt: string;
-  fallback: boolean;         // true when classifier failed and we defaulted
+  fallback: boolean; // true when classifier failed and we defaulted
 }
 
 /** Metadata attached to each assistant UI message. `routing`+`classifierUsage`

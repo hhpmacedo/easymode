@@ -11,7 +11,7 @@ export interface TurnCosts {
   classifierCost: number;
   totalCost: number;
   baselineCost: number; // counterfactual: same tokens at always-Opus prices
-  savings: number;      // baselineCost - totalCost (can be negative for Fable)
+  savings: number; // baselineCost - totalCost (can be negative for Fable)
   savingsPct: number;
 }
 

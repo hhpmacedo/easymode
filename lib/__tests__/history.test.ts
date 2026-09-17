@@ -10,9 +10,7 @@ function assistant(id: string, text: string, optimizedPrompt?: string): EasyUIMe
     id,
     role: "assistant",
     parts: [{ type: "text", text }],
-    metadata: optimizedPrompt
-      ? { routing: { optimizedPrompt } as never }
-      : undefined,
+    metadata: optimizedPrompt ? { routing: { optimizedPrompt } as never } : undefined,
   } as EasyUIMessage;
 }
 

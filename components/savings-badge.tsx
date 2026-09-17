@@ -10,7 +10,8 @@ export function SavingsBadge({ savings, pct }: { savings: number; pct: number })
       }`}
       title="Estimated vs always using Opus 4.8, holding output length constant. Includes router cost."
     >
-      {positive ? "saved" : "premium"} {formatUSD(Math.abs(savings))} ({Math.abs(pct).toFixed(0)}%) · est.
+      {positive ? "saved" : "premium"} {formatUSD(Math.abs(savings))} ({Math.abs(pct).toFixed(0)}%)
+      · est.
     </span>
   );
 }

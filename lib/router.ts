@@ -56,7 +56,9 @@ export const classifierSchema = z.object({
   taskType: z.string().describe("2-4 word label, e.g. 'code debugging', 'casual chat'"),
   complexity: z.enum(COMPLEXITIES),
   chosenModel: z.enum(MODEL_IDS),
-  reasoning: z.string().describe("One sentence: why this model is the cheapest that will do the job well"),
+  reasoning: z
+    .string()
+    .describe("One sentence: why this model is the cheapest that will do the job well"),
   optimizedPrompt: z.string().describe("The rewritten, excellent version of the user's message"),
 });
 export type ClassifierOutput = z.infer<typeof classifierSchema>;
@@ -102,10 +104,7 @@ export interface ClassifyResult {
 }
 
 /** One Haiku call: classify + rewrite + route. Throws on failure (caller falls back). */
-export async function classify(
-  history: EasyUIMessage[],
-  rawText: string,
-): Promise<ClassifyResult> {
+export async function classify(history: EasyUIMessage[], rawText: string): Promise<ClassifyResult> {
   const { object, usage } = await generateObject({
     model: anthropic(CLASSIFIER_MODEL),
     schema: classifierSchema,
