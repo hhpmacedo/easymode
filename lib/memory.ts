@@ -57,6 +57,13 @@ const STOP_WORDS = new Set([
   "does",
   "also",
   "about",
+  "at",
+  "in",
+  "of",
+  "on",
+  "to",
+  "as",
+  "is",
 ]);
 
 /** Every token counts, however short: "R", "Go", "C" and version numbers are
@@ -72,10 +79,19 @@ function words(text: string): Set<string> {
 
 const NEGATION = /\b(?:not|no|never)\b|n't\b/;
 
-/** Same fact in different words: high word overlap, or one's words contain the
- *  other's (same fact, more detail). Word-set, not substring, so "Uses R" is
- *  not inside "Uses React". A negated and a non-negated sentence are never the
- *  same fact. */
+/** Two facts count as the same when their content words overlap at least
+ *  this much (Jaccard). High on purpose: a shared sentence template with one
+ *  fact word swapped ("Lives in beautiful Lisbon" / "… London") must stay
+ *  distinct, and the containment rule already catches rephrasings. */
+const NEAR_DUPLICATE_OVERLAP = 0.8;
+
+const HAS_DIGIT = /\p{N}/u;
+
+/** Same fact in different words: one's words contain the other's (same fact,
+ *  more detail), or the word sets overlap heavily and the words that differ
+ *  are not numbers — a version or a count that differs is a different fact.
+ *  Word-set, not substring, so "Uses R" is not inside "Uses React". A negated
+ *  and a non-negated sentence are never the same fact. */
 export function isNearDuplicate(a: string, b: string): boolean {
   const na = normalizeMemoryText(a).toLowerCase();
   const nb = normalizeMemoryText(b).toLowerCase();
@@ -87,7 +103,10 @@ export function isNearDuplicate(a: string, b: string): boolean {
   let shared = 0;
   for (const w of wa) if (wb.has(w)) shared++;
   if (shared === wa.size || shared === wb.size) return true;
-  return shared / (wa.size + wb.size - shared) >= 0.6;
+  if (shared / (wa.size + wb.size - shared) < NEAR_DUPLICATE_OVERLAP) return false;
+  for (const w of wa) if (!wb.has(w) && HAS_DIGIT.test(w)) return false;
+  for (const w of wb) if (!wa.has(w) && HAS_DIGIT.test(w)) return false;
+  return true;
 }
 
 export interface MergeContext {

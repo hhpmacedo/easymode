@@ -56,6 +56,25 @@ describe("isNearDuplicate", () => {
     expect(isNearDuplicate("Uses Python 3", "Uses Python 2")).toBe(false);
     expect(isNearDuplicate("Team of 4", "Team of 40")).toBe(false);
   });
+  it("does not match a shared sentence template that differs in one fact word", () => {
+    expect(isNearDuplicate("Lives in beautiful Lisbon", "Lives in beautiful London")).toBe(false);
+    expect(isNearDuplicate("Uses Python 3 at work", "Uses Python 2 at work")).toBe(false);
+    expect(isNearDuplicate("Works at Acme as a designer", "Works at Beta as a designer")).toBe(
+      false,
+    );
+    expect(
+      isNearDuplicate("Team lead of 4 engineers in Berlin", "Team lead of 4 engineers in Lisbon"),
+    ).toBe(false);
+    expect(isNearDuplicate("Has 2 kids and a dog at home", "Has 3 kids and a dog at home")).toBe(
+      false,
+    );
+  });
+  it("never merges near-identical sentences whose only difference is a number", () => {
+    // Word overlap here is 9/11, above the threshold: only the digit veto keeps them apart.
+    const a = "Runs the weekly design review meeting every Monday morning with 5 engineers";
+    const b = "Runs the weekly design review meeting every Monday morning with 6 engineers";
+    expect(isNearDuplicate(a, b)).toBe(false);
+  });
   it("compares whole words, so a prefix or a short token is not a match", () => {
     expect(isNearDuplicate("Uses R", "Uses React")).toBe(false);
     expect(isNearDuplicate("Has a cat", "Has a category system for notes")).toBe(false);
