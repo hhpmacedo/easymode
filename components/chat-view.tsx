@@ -6,6 +6,7 @@ import { MessageList } from "./message-list";
 import { Composer } from "./composer";
 import { KeySettings } from "./key-settings";
 import { turnCosts, formatUSD } from "@/lib/costs";
+import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
 import type { ConversationStore } from "@/lib/storage";
 import type { EasyUIMessage } from "@/lib/types";
@@ -95,7 +96,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
                 {formatUSD(Math.abs(total.savings))} (~{Math.abs(total.pct).toFixed(0)}%)
               </span>
             </strong>{" "}
-            vs always-Opus · est.
+            vs always-{PRICING[BASELINE_MODEL].label} · est.
           </span>
         )}
       </header>
