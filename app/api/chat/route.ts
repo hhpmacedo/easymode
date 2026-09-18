@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   // never throws — a refusal surfaces as finishReason "content-filter" (Anthropic
   // stop_reason "refusal") and API/network failures reject the finishReason promise,
   // so await completion (the result stream is buffered and replayable) and retry.
-  if (routing.finalModel === "claude-fable-5") {
+  if (routing.finalModel.startsWith("claude-fable")) {
     let declined = false;
     try {
       declined = (await result.finishReason) === "content-filter";

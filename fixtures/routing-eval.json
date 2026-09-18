@@ -36,15 +36,15 @@
   },
   {
     "prompt": "design a database schema and API surface for a multi-tenant SaaS invoicing system with usage-based billing, proration, and dunning. Explain the key tradeoffs you made.",
-    "expected": ["claude-opus-5", "claude-fable-5"]
+    "expected": ["claude-opus-5", "claude-fable-5-1"]
   },
   {
     "prompt": "review this architecture: we sync data between two eventually-consistent stores using a CDC pipeline, but consumers sometimes see deletes before the corresponding creates. Propose ordering guarantees and failure-mode analysis for exactly-once semantics across both stores.",
-    "expected": ["claude-opus-5", "claude-fable-5"]
+    "expected": ["claude-opus-5", "claude-fable-5-1"]
   },
   {
     "prompt": "prove that the halting problem is undecidable, then explain how Rice's theorem generalizes it, with rigorous definitions throughout",
-    "expected": ["claude-opus-5", "claude-fable-5"]
+    "expected": ["claude-opus-5", "claude-fable-5-1"]
   },
   { "prompt": "why is the sky blue?", "expected": ["claude-haiku-4-5", "claude-sonnet-5"] },
   {
@@ -62,6 +62,6 @@
   },
   {
     "prompt": "outline a step-by-step migration plan to move a 2M-line monolith to microservices over 18 months without a feature freeze, including org design, strangler-fig sequencing, data ownership splits, and rollback strategy for each phase",
-    "expected": ["claude-opus-5", "claude-fable-5"]
+    "expected": ["claude-opus-5", "claude-fable-5-1"]
   }
 ]
