@@ -2,6 +2,7 @@ import { streamText } from "ai";
 import { classify, applyGuardrail, atLeastTier, priorTier, rewriteGuard } from "@/lib/router";
 import { latestUserText } from "@/lib/history";
 import { assembleRequest, todayISO } from "@/lib/context";
+import { parseCompactionContext } from "@/lib/compaction";
 import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
 import { BASE_PROMPT, PROMPT_VERSION } from "@/lib/prompts/base";
 import { INSTRUCTIONS_MAX } from "@/lib/settings";
@@ -64,6 +65,9 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // A malformed compaction is ignored, not rejected: the client owns it and
+  // the worst case is sending the full thread (spec §6.3, §7.4).
+  const compaction = parseCompactionContext(context.compaction);
   if (context.promptVersion && context.promptVersion !== PROMPT_VERSION) {
     console.warn(
       `[easymode] client prompt version ${context.promptVersion} ≠ server ${PROMPT_VERSION}`,
@@ -119,6 +123,7 @@ export async function POST(req: Request) {
       ...assembleRequest({
         base: BASE_PROMPT,
         instructions,
+        compaction,
         messages,
         optimizedPrompt: routing.optimizedPrompt,
         today,
