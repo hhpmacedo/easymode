@@ -6,7 +6,7 @@ import { MessageList } from "./message-list";
 import { Composer } from "./composer";
 import { KeySettings } from "./key-settings";
 import { turnCosts, formatUSD } from "@/lib/costs";
-import { getUserKey } from "@/lib/client-key";
+import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
 import type { ConversationStore } from "@/lib/storage";
 import type { EasyUIMessage } from "@/lib/types";
 
@@ -19,6 +19,14 @@ interface Props {
 
 export function ChatView({ conversationId, initialMessages, store, onMessagesChanged }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Reflect whether the user has connected their own key, so the empty state
+  // can invite them to. Subscription only (no setState in the effect body).
+  const [hasUserKey, setHasUserKey] = useState<boolean>(() => !!getUserKey());
+  useEffect(() => {
+    const onChange = () => setHasUserKey(!!getUserKey());
+    window.addEventListener(KEY_CHANGE_EVENT, onChange);
+    return () => window.removeEventListener(KEY_CHANGE_EVENT, onChange);
+  }, []);
   const { messages, sendMessage, status, error, regenerate } = useChat<EasyUIMessage>({
     id: conversationId,
     messages: initialMessages,
@@ -91,7 +99,14 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           </span>
         )}
       </header>
-      <MessageList messages={messages} status={status} error={error} onRetry={() => regenerate()} />
+      <MessageList
+        messages={messages}
+        status={status}
+        error={error}
+        onRetry={() => regenerate()}
+        needsKey={!hasUserKey}
+        onConnectKey={() => setSettingsOpen(true)}
+      />
       <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
       {settingsOpen && <KeySettings onClose={() => setSettingsOpen(false)} />}
     </div>
