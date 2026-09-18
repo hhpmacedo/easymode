@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGuardrail } from "../router";
+import { applyGuardrail, atLeastTier } from "../router";
 
 const SHORT = "hello there friend"; // 3 words, no code
 const LONG = Array(320).fill("word").join(" "); // >300 words
@@ -77,5 +77,13 @@ describe("applyGuardrail", () => {
       model: "claude-sonnet-5",
       applied: false,
     });
+  });
+});
+
+describe("atLeastTier", () => {
+  it("returns the prior tier when it outranks the model, else the model", () => {
+    expect(atLeastTier("claude-haiku-4-5", "claude-opus-5")).toBe("claude-opus-5");
+    expect(atLeastTier("claude-opus-5", "claude-haiku-4-5")).toBe("claude-opus-5");
+    expect(atLeastTier("claude-sonnet-5")).toBe("claude-sonnet-5");
   });
 });

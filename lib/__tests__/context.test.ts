@@ -86,6 +86,27 @@ describe("assembleRequest", () => {
     ]);
   });
 
+  it("keeps turn N's request as a byte-identical prefix of turn N+1 (minus the moved B)", () => {
+    const prev = assembleRequest(base);
+    const next = assembleRequest({
+      ...base,
+      messages: [...thread, assistant("4", "answer two", "OPT two"), user("5", "raw three")],
+      optimizedPrompt: "OPT three",
+    });
+    expect(next.instructions).toEqual(prev.instructions);
+    // The previous B collapses back to plain text; everything before it is unchanged.
+    const prevPlain = [...prev.messages.slice(0, -1), { role: "user", content: "OPT two" }];
+    expect(next.messages.slice(0, prevPlain.length)).toEqual(prevPlain);
+  });
+
+  it("sets no breakpoint B when the latest turn is not a user message", () => {
+    const { messages } = assembleRequest({
+      ...base,
+      messages: [user("1", "raw one"), assistant("2", "answer one", "OPT one")],
+    });
+    expect(messages.every((m) => typeof m.content === "string")).toBe(true);
+  });
+
   it("substitutes the optimized prompt for the latest user turn", () => {
     const { messages } = assembleRequest({ ...base, optimizedPrompt: "REWRITTEN" });
     expect(messages[messages.length - 1]).toEqual({

@@ -87,6 +87,8 @@ a new B each turn still reuses the previous prefix.
 | Instruction or memory edit | one miss per open thread | none needed; extraction results apply to new turns naturally |
 | Date rollover | one miss per thread per day | date is last in `system`, ISO date only |
 | Compaction | one miss | by design; net positive from the next turn |
+| Classifier failure (fallback) | none extra | fallback model is `atLeastTier(Sonnet, prior)`, so the thread tier holds |
+| Fable declined → Opus retry | one miss on Opus; next turn's floor is Opus, and a later exceptional prompt may re-enter Fable (another miss) | accepted; the declined Fable attempt's tokens are not reported in metadata |
 
 **Minimum cacheable prefix** is model-dependent (4,096 tokens on Haiku 4.5;
 assume 4K for all until verified per model). Caching therefore starts paying
