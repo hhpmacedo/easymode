@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { generateText } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { assembleRequest, todayISO } from "../context";
-import type { EasyUIMessage } from "../types";
+import { COMPACTION_ACK, renderCompaction } from "../compaction";
+import type { CompactionSummary, EasyUIMessage } from "../types";
 
 function user(id: string, text: string): EasyUIMessage {
   return { id, role: "user", parts: [{ type: "text", text }] } as EasyUIMessage;
@@ -147,6 +148,56 @@ describe("assembleRequest", () => {
     expect(prompt[prompt.length - 1]).toEqual({
       role: "user",
       content: [{ type: "text", text: "OPT two", providerOptions: CACHE }], // breakpoint B
+    });
+  });
+
+  describe("with a compaction", () => {
+    const summary: CompactionSummary = {
+      goal: "g",
+      decisions: ["d1"],
+      facts: [],
+      artifacts: [],
+      open: ["o1"],
+    };
+    const long = [
+      user("1", "raw one"),
+      assistant("2", "answer one", "OPT one"),
+      user("3", "raw two"),
+      assistant("4", "answer two", "OPT two"),
+      user("5", "raw three"),
+    ];
+    const input = {
+      messages: long,
+      optimizedPrompt: "OPT three",
+      today: "2026-09-18",
+      compaction: { throughMessageId: "2", summary },
+    };
+
+    it("drops turns through the boundary and prepends the compaction pair", () => {
+      const { messages } = assembleRequest(input);
+      expect(messages).toEqual([
+        { role: "user", content: renderCompaction(summary) },
+        { role: "assistant", content: COMPACTION_ACK },
+        { role: "user", content: "OPT two" },
+        { role: "assistant", content: "answer two" },
+        { role: "user", content: [{ type: "text", text: "OPT three", providerOptions: CACHE }] },
+      ]);
+    });
+    it("puts no breakpoint on the pair and keeps B on the latest user turn", () => {
+      const { messages } = assembleRequest(input);
+      expect(messages[0].providerOptions).toBeUndefined();
+      expect(messages[1].providerOptions).toBeUndefined();
+    });
+    it("ignores a boundary id that is not in the thread", () => {
+      const { messages } = assembleRequest({
+        ...input,
+        compaction: { throughMessageId: "missing", summary },
+      });
+      expect(messages).toHaveLength(5);
+      expect(messages[0]).toEqual({ role: "user", content: "OPT one" });
+    });
+    it("is byte-identical for identical input", () => {
+      expect(JSON.stringify(assembleRequest(input))).toBe(JSON.stringify(assembleRequest(input)));
     });
   });
 });
