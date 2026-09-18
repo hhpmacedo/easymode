@@ -50,7 +50,11 @@ export function useMemoryExtraction({
 
   const extract = async (snapshot: EasyUIMessage[]) => {
     if (!getSettings().memoryEnabled || inFlight.has(conversationId)) return;
-    const through = store.getMeta(conversationId)?.extractedThrough;
+    // No meta means the conversation was deleted (not switched away from):
+    // never extract from content the user just discarded.
+    const meta = store.getMeta(conversationId);
+    if (!meta) return;
+    const through = meta.extractedThrough;
     if (newUserTurnsSince(snapshot, through) < EXTRACT_MIN_USER_TURNS) return;
     const turns = turnsSince(snapshot, through);
     if (!turns.length) return;
@@ -75,8 +79,11 @@ export function useMemoryExtraction({
       const data = (await r.json()) as { result?: unknown; usage?: TokenUsage };
       const result = extractionSchema.safeParse(data.result);
       if (!result.success) return;
-      // Merge against the CURRENT list (the user may have edited meanwhile).
-      const merged = mergeMemories(memoryStore.list(), result.data, {
+      // Merge against the CURRENT list (the user may have edited meanwhile),
+      // and diff against that same list so the toast (and its Undo) only
+      // covers what this extraction added — not memories added in flight.
+      const current = memoryStore.list();
+      const merged = mergeMemories(current, result.data, {
         now: Date.now(),
         conversationId,
         newId: () => crypto.randomUUID(),
@@ -84,7 +91,7 @@ export function useMemoryExtraction({
       memoryStore.replaceAll(merged);
       if (data.usage) memoryStore.recordCost(costOf(CLASSIFIER_MODEL, data.usage));
       store.setExtractedThrough(conversationId, snapshot[snapshot.length - 1].id);
-      const added = merged.filter((m) => !before.some((b) => b.id === m.id));
+      const added = merged.filter((m) => !current.some((b) => b.id === m.id));
       if (added.length) {
         window.dispatchEvent(new CustomEvent<Memory[]>(MEMORY_ADDED_EVENT, { detail: added }));
       }
