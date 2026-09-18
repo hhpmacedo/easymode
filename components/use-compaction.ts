@@ -42,7 +42,14 @@ export function useCompaction({
         method: "POST",
         headers: { "Content-Type": "application/json", ...(key ? { "x-anthropic-key": key } : {}) },
         body: JSON.stringify({
-          messages: choice.toCompact,
+          // Only what the compactor reads (role + text): metadata (optimized
+          // prompts, reasoning, usage) would bloat the body toward the route's
+          // size cap at high thresholds and ship classifier reasoning for nothing.
+          messages: choice.toCompact.map(({ id, role, parts }) => ({
+            id,
+            role,
+            parts: parts.filter((p) => p.type === "text"),
+          })),
           prior: prior?.summary,
           priorEdited: prior?.edited ?? false,
         }),
