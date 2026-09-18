@@ -3,6 +3,7 @@ import { classify, applyGuardrail, atLeastTier, priorTier, rewriteGuard } from "
 import { latestUserText } from "@/lib/history";
 import { assembleRequest, todayISO } from "@/lib/context";
 import { parseCompactionContext } from "@/lib/compaction";
+import { MEMORY_CAP_TOKENS, MEMORY_TEXT_MAX } from "@/lib/memory";
 import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
 import { BASE_PROMPT, PROMPT_VERSION } from "@/lib/prompts/base";
 import { INSTRUCTIONS_MAX } from "@/lib/settings";
@@ -68,6 +69,17 @@ export async function POST(req: Request) {
   // A malformed compaction is ignored, not rejected: the client owns it and
   // the worst case is sending the full thread (spec §6.3, §7.4).
   const compaction = parseCompactionContext(context.compaction);
+  // Memory lines: the client's own context, bounded here (spec §4.3, §7.4).
+  // Anything malformed or oversized is dropped, not rejected.
+  const memory = Array.isArray(context.memory)
+    ? (context.memory as unknown[])
+        .filter(
+          (l): l is string => typeof l === "string" && l.length > 0 && l.length <= MEMORY_TEXT_MAX,
+        )
+        .slice(0, 200)
+    : [];
+  const memoryChars = memory.reduce((n, l) => n + l.length, 0);
+  const memoryLines = memoryChars / 4 <= MEMORY_CAP_TOKENS * 1.1 ? memory : [];
   if (context.promptVersion && context.promptVersion !== PROMPT_VERSION) {
     console.warn(
       `[easymode] client prompt version ${context.promptVersion} ≠ server ${PROMPT_VERSION}`,
@@ -81,7 +93,7 @@ export async function POST(req: Request) {
   let routing: RoutingDecision;
   let classifierUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   try {
-    const { decision, usage } = await classify(history, rawText, provider);
+    const { decision, usage } = await classify(history, rawText, provider, memoryLines);
     const { model, applied } = applyGuardrail(
       decision.chosenModel,
       decision.complexity,
@@ -123,6 +135,7 @@ export async function POST(req: Request) {
       ...assembleRequest({
         base: BASE_PROMPT,
         instructions,
+        memory: memoryLines,
         compaction,
         messages,
         optimizedPrompt: routing.optimizedPrompt,
