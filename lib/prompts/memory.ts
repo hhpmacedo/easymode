@@ -1,5 +1,12 @@
-/** Prompts for the memory-extraction job (spec §5.3). Server only. */
+/** Prompts and payload limits for the memory-extraction job (spec §5.3).
+ *  The prompts are server only; the limits are shared with the client so it
+ *  clips before sending and the route never has to reject a real conversation. */
 import type { Memory } from "../types";
+
+/** Most turns one extraction call reads; the route keeps the newest. */
+export const MAX_TURNS = 80;
+/** Characters kept per turn; the client clips to this before JSON.stringify. */
+export const MAX_TURN_CHARS = 4_000;
 
 export const EXTRACTION_SYSTEM = `You maintain a short list of durable facts about a person, learned from their conversations with an assistant, so future conversations can be tailored to them without asking again.
 
@@ -17,7 +24,7 @@ Rules:
 - Do not repeat an existing memory. If a new statement refines one, put it in \`update\` with that memory's id. If a statement contradicts one, \`archive\` the old id and \`add\` the new fact.
 - When unsure, return nothing. Empty lists are a good answer.`;
 
-export const CONSOLIDATE_NOTE = `The memory list has grown past its size limit. Return, in \`update\`/\`archive\`/\`add\`, a rewrite of the WHOLE set that says the same things in fewer, denser lines: merge overlapping items into one (archive the originals, add the merged line), drop anything stale, keep every fact that still matters.`;
+export const CONSOLIDATE_NOTE = `The memory list has grown past its size limit. Within the response limits (at most 20 \`add\`, 20 \`update\`, 50 \`archive\`), merge the most overlapping items first (archive the originals, add one merged line), drop anything stale, keep every fact that still matters. Partial progress is fine; you will be called again while the list is over its limit.`;
 
 export function buildExtractionPrompt(
   turns: { role: "user" | "assistant"; text: string }[],

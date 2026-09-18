@@ -2,7 +2,12 @@ import { resolveExtractAuth } from "@/lib/auth";
 import { providerFor } from "@/lib/provider";
 import { readJsonBody, runJob } from "@/lib/api-helpers";
 import { extractionSchema, MEMORY_TEXT_MAX } from "@/lib/memory";
-import { EXTRACTION_SYSTEM, buildExtractionPrompt } from "@/lib/prompts/memory";
+import {
+  EXTRACTION_SYSTEM,
+  MAX_TURNS,
+  MAX_TURN_CHARS,
+  buildExtractionPrompt,
+} from "@/lib/prompts/memory";
 import { MEMORY_KINDS } from "@/lib/types";
 import type { Memory } from "@/lib/types";
 
@@ -10,8 +15,6 @@ export const maxDuration = 60;
 
 // One quiet-moment's worth of turns plus the memory list.
 const MAX_BODY_BYTES = 400_000;
-const MAX_TURNS = 80;
-const MAX_TURN_CHARS = 4_000;
 const MAX_MEMORIES = 300;
 
 type Turn = { role: "user" | "assistant"; text: string };
@@ -33,17 +36,21 @@ export async function POST(req: Request) {
   const turns = Array.isArray(body.turns) ? (body.turns as Turn[]) : [];
   const turnsOk =
     turns.length > 0 &&
-    turns.length <= MAX_TURNS &&
     turns.every(
       (t) => t && (t.role === "user" || t.role === "assistant") && typeof t.text === "string",
     );
   if (!turnsOk) {
     return Response.json(
-      { error: `Expected 1–${MAX_TURNS} turns of { role, text }.` },
+      { error: "Expected a non-empty list of { role, text } turns." },
       { status: 400 },
     );
   }
-  const clipped = turns.map((t) => ({ role: t.role, text: t.text.slice(0, MAX_TURN_CHARS) }));
+  // Clip rather than reject: the client resends everything since its last
+  // successful extraction, so a hard cap would leave a long-idle conversation
+  // failing forever. Keep the newest turns; the oldest have had the most chances.
+  const clipped = turns
+    .slice(-MAX_TURNS)
+    .map((t) => ({ role: t.role, text: t.text.slice(0, MAX_TURN_CHARS) }));
 
   const memories = Array.isArray(body.memories)
     ? (body.memories as Pick<Memory, "id" | "text" | "kind">[])
