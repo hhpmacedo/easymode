@@ -9,7 +9,7 @@ routing reasoning, and estimated savings vs always using Opus.
 
 ## Run
 
-    cp .env.example .env.local   # add your ANTHROPIC_API_KEY
+    cp .env.example .env.local   # add your ANTHROPIC_API_KEY (+ EASYMODE_ACCESS_TOKEN)
     npm install
     npm run dev                  # http://localhost:3000
 
@@ -41,11 +41,28 @@ minus what we actually spent, router cost included.
 - Model IDs and prices live only in `lib/pricing.ts` — change them there.
 - Dependabot updates npm deps weekly (minor/patch grouped) and Actions monthly.
 
-## Deployment caution
+## Access control (protecting your API key)
 
-Do **not** deploy this publicly as-is: `/api/chat` is an unauthenticated proxy
-to the Anthropic API, so a public URL lets anyone spend your API credits. Add
-auth or rate limiting first.
+`/api/chat` is a proxy to the Anthropic API billed to your `ANTHROPIC_API_KEY`,
+so it is gated by a second secret, `EASYMODE_ACCESS_TOKEN`:
+
+- **Production:** required. If it is unset the API refuses every request (503)
+  instead of running as an open proxy. Generate one with
+  `openssl rand -base64 32` and set it in your host's environment.
+- **Development:** optional. When unset, requests are allowed only when the app
+  is addressed as `localhost` / `127.0.0.1`; any other host is denied.
+- **Browser:** the UI asks for the token once and stores an HttpOnly,
+  SameSite=Strict session cookie (30 days). `DELETE /api/auth` logs out.
+- **Scripts:** send `Authorization: Bearer <token>` instead.
+- **Brakes:** per-IP rate limits (30 chat calls / 10 min, 10 sign-in attempts /
+  15 min), a 200 KB body cap, and a 200-message cap. The limiter is in-memory
+  and keys on `x-forwarded-for`, so it only bites when a trusted reverse proxy
+  sets that header. The token is the real boundary; the limiter caps damage.
+
+Rotate the token by changing the env var and redeploying: existing sessions
+stop working immediately. Never commit `.env.local` (it is gitignored) and keep
+the Anthropic key server-side only; nothing under `components/` or `app/page.tsx`
+may import `lib/auth.ts`, `lib/router.ts`, or `@ai-sdk/anthropic`.
 
 Spec: `docs/superpowers/specs/2026-09-17-easymode-design.md` ·
 Plan: `docs/superpowers/plans/2026-09-17-easymode-v1.md` · License: MIT

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { AccessGate } from "@/components/access-gate";
 import { ChatView } from "@/components/chat-view";
 import { Sidebar } from "@/components/sidebar";
 import { browserStore } from "@/lib/storage";
@@ -29,36 +30,38 @@ export default function Home() {
   if (!store || !activeId) return null;
 
   return (
-    <main className="flex h-screen">
-      <Sidebar
-        conversations={conversations}
-        activeId={activeId}
-        onNew={() => {
-          const c = store.create();
-          refresh();
-          setActiveId(c.id);
-        }}
-        onSelect={setActiveId}
-        onRename={(id, t) => {
-          store.rename(id, t);
-          refresh();
-        }}
-        onDelete={(id) => {
-          store.remove(id);
-          const rest = store.list();
-          setConversations(rest);
-          setActiveId(rest[0]?.id ?? store.create().id);
-          refresh();
-        }}
-      />
-      {/* key= remounts useChat state per conversation */}
-      <ChatView
-        key={activeId}
-        conversationId={activeId}
-        initialMessages={store.getMessages(activeId)}
-        store={store}
-        onMessagesChanged={refresh}
-      />
-    </main>
+    <AccessGate>
+      <main className="flex h-screen">
+        <Sidebar
+          conversations={conversations}
+          activeId={activeId}
+          onNew={() => {
+            const c = store.create();
+            refresh();
+            setActiveId(c.id);
+          }}
+          onSelect={setActiveId}
+          onRename={(id, t) => {
+            store.rename(id, t);
+            refresh();
+          }}
+          onDelete={(id) => {
+            store.remove(id);
+            const rest = store.list();
+            setConversations(rest);
+            setActiveId(rest[0]?.id ?? store.create().id);
+            refresh();
+          }}
+        />
+        {/* key= remounts useChat state per conversation */}
+        <ChatView
+          key={activeId}
+          conversationId={activeId}
+          initialMessages={store.getMessages(activeId)}
+          store={store}
+          onMessagesChanged={refresh}
+        />
+      </main>
+    </AccessGate>
   );
 }
