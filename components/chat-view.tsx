@@ -1,17 +1,18 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageList } from "./message-list";
 import { Composer } from "./composer";
 import { SettingsModal, type SettingsTab } from "./settings-modal";
-import { turnCosts, conversationSavings, formatUSD } from "@/lib/costs";
+import { useCompaction } from "./use-compaction";
+import { turnCosts, conversationSavings, formatUSD, formatTokens } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
 import { getSettings } from "@/lib/settings";
 import { PROMPT_VERSION } from "@/lib/prompts/base";
 import type { ConversationStore } from "@/lib/storage";
-import type { EasyUIMessage } from "@/lib/types";
+import type { CompactionSummary, EasyUIMessage } from "@/lib/types";
 
 interface Props {
   conversationId: string;
@@ -40,11 +41,45 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
       },
       // Context rides with every send (spec §7.1). Read at send time so an
       // edit in Settings applies to the next message with no reload.
-      body: () => ({
-        context: { instructions: getSettings().instructions, promptVersion: PROMPT_VERSION },
-      }),
+      body: () => {
+        const c = store.getMeta(conversationId)?.compaction;
+        return {
+          context: {
+            instructions: getSettings().instructions,
+            promptVersion: PROMPT_VERSION,
+            ...(c
+              ? { compaction: { throughMessageId: c.throughMessageId, summary: c.summary } }
+              : {}),
+          },
+        };
+      },
     }),
   });
+
+  // Compaction lives on the store's meta, not in useChat state; bump a
+  // counter when it changes so the card and header re-read it.
+  const [metaVersion, setMetaVersion] = useState(0);
+  const onMetaChanged = useCallback(() => {
+    setMetaVersion((v) => v + 1);
+    onMessagesChanged();
+  }, [onMessagesChanged]);
+  const { compactNow, contextTokens } = useCompaction({
+    conversationId,
+    messages,
+    status,
+    store,
+    onChanged: onMetaChanged,
+  });
+  const compaction = useMemo(
+    () => store.getMeta(conversationId)?.compaction,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- metaVersion is the invalidation signal
+    [store, conversationId, metaVersion],
+  );
+  const saveCompaction = (summary: CompactionSummary) => {
+    if (!compaction) return;
+    store.setCompaction(conversationId, { ...compaction, summary, edited: true });
+    onMetaChanged();
+  };
 
   // Track key connect/disconnect; flush a pending suggestion once connected.
   // setState/send happen in the event callback, not the effect body.
@@ -109,6 +144,15 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           >
             Settings
           </button>
+          {contextTokens > 0 && (
+            <button
+              onClick={() => void compactNow()}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
+              title="Context the model sees on the next message. Click to summarize older turns now."
+            >
+              Context <span className="tabular">{formatTokens(contextTokens)}</span> · compact
+            </button>
+          )}
         </div>
         {total.hasTurns && (
           <span className="flex items-center gap-2 text-xs text-muted">
@@ -144,6 +188,8 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         needsKey={!hasUserKey}
         onConnectKey={() => setSettings("key")}
         onSuggestion={onSuggestion}
+        compaction={compaction}
+        onSaveCompaction={saveCompaction}
       />
       <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
       {settings && <SettingsModal initialTab={settings} onClose={() => setSettings(null)} />}
