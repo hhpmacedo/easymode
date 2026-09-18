@@ -4,7 +4,7 @@
 
 **Goal:** Make every answer call prompt-cache-friendly and cost-accounted — cache-aware `TokenUsage`, the tier ratchet, a single request-assembly function with two cache breakpoints, an output cap, and a "from cache" line in the reveal — with a live tripwire proving the cache hits.
 
-**Architecture:** A new pure module `lib/context.ts` owns the shape of the answer request (system entries first, then turns, with Anthropic `cacheControl` breakpoints at the end of the stable system layer and on the latest user turn). `app/api/chat/route.ts` calls it instead of building messages itself. `lib/costs.ts` prices cache reads/writes at their multipliers; the guardrail gains a floor so a thread never drops tiers (the cache is per model). Spec: `docs/superpowers/specs/2026-09-18-context-layer-design.md` §3.
+**Architecture:** A new pure module `lib/context.ts` owns the shape of the answer request: `{ instructions, messages }` — the system layer first (spread into `streamText`'s `instructions` option, because AI SDK v7 rejects system entries inside `messages`), then the turns, with Anthropic `cacheControl` breakpoints at the end of the stable system layer and on the latest user turn. `app/api/chat/route.ts` spreads it into `streamText` instead of building messages itself. `lib/costs.ts` prices cache reads/writes at their multipliers; the guardrail gains a floor so a thread never drops tiers (the cache is per model). Spec: `docs/superpowers/specs/2026-09-18-context-layer-design.md` §3.
 
 **Tech Stack:** Next.js 16 (App Router), AI SDK v7 (`ai`, `@ai-sdk/anthropic` — `providerOptions.anthropic.cacheControl`, `usage.inputTokenDetails`), TypeScript, vitest, tsx.
 
@@ -275,6 +275,8 @@ Create `lib/__tests__/context.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
+import { generateText } from "ai";
+import { MockLanguageModelV3 } from "ai/test";
 import { assembleRequest, todayISO } from "../context";
 import type { EasyUIMessage } from "../types";
 
@@ -291,7 +293,11 @@ function assistant(id: string, text: string, optimizedPrompt?: string): EasyUIMe
 }
 
 const CACHE = { anthropic: { cacheControl: { type: "ephemeral" } } };
-const thread = [user("1", "raw one"), assistant("2", "answer one", "OPT one"), user("3", "raw two")];
+const thread = [
+  user("1", "raw one"),
+  assistant("2", "answer one", "OPT one"),
+  user("3", "raw two"),
+];
 const base = { messages: thread, optimizedPrompt: "OPT two", today: "2026-09-18" };
 
 describe("todayISO", () => {
@@ -305,21 +311,19 @@ describe("assembleRequest", () => {
     expect(JSON.stringify(assembleRequest(base))).toBe(JSON.stringify(assembleRequest(base)));
   });
 
-  it("with no instruction layer, system is just the date, and it carries no breakpoint", () => {
-    const out = assembleRequest(base);
-    const system = out.filter((m) => m.role === "system");
-    expect(system).toEqual([{ role: "system", content: "Today is 2026-09-18." }]);
+  it("with no instruction layer, instructions is just the date, and it carries no breakpoint", () => {
+    const { instructions } = assembleRequest(base);
+    expect(instructions).toEqual([{ role: "system", content: "Today is 2026-09-18." }]);
   });
 
-  it("orders system entries base → instructions → memory → date", () => {
-    const out = assembleRequest({
+  it("orders instructions base → user instructions → memory → date", () => {
+    const { instructions } = assembleRequest({
       ...base,
       base: "BASE",
       instructions: "  be terse  ",
       memory: ["prefers pnpm", "works in TS"],
     });
-    const system = out.filter((m) => m.role === "system").map((m) => m.content);
-    expect(system).toEqual([
+    expect(instructions.map((m) => m.content)).toEqual([
       "BASE",
       "<user_instructions>\nbe terse\n</user_instructions>",
       "<memory>\n- prefers pnpm\n- works in TS\n</memory>",
@@ -328,22 +332,30 @@ describe("assembleRequest", () => {
   });
 
   it("omits empty blocks so the prefix matches the no-instructions case", () => {
-    const out = assembleRequest({ ...base, base: "", instructions: "   ", memory: [] });
-    expect(out.filter((m) => m.role === "system")).toHaveLength(1);
+    const { instructions } = assembleRequest({
+      ...base,
+      base: "",
+      instructions: "   ",
+      memory: [],
+    });
+    expect(instructions).toHaveLength(1);
   });
 
-  it("puts breakpoint A on the last stable system entry, never on the date", () => {
-    const out = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
-    const system = out.filter((m) => m.role === "system");
-    expect(system[0].providerOptions).toBeUndefined(); // BASE
-    expect(system[1].providerOptions).toEqual(CACHE); // memory (last stable)
-    expect(system[2].providerOptions).toBeUndefined(); // date
+  it("puts breakpoint A on the last stable instruction entry, never on the date", () => {
+    const { instructions } = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+    expect(instructions[0].providerOptions).toBeUndefined(); // BASE
+    expect(instructions[1].providerOptions).toEqual(CACHE); // memory (last stable)
+    expect(instructions[2].providerOptions).toBeUndefined(); // date
+  });
+
+  it("keeps system entries out of messages (the AI SDK rejects them there)", () => {
+    const { messages } = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+    expect(messages.some((m) => m.role === "system")).toBe(false);
   });
 
   it("puts breakpoint B on the latest user turn's text part only", () => {
-    const out = assembleRequest(base);
-    const turns = out.filter((m) => m.role !== "system");
-    expect(turns).toEqual([
+    const { messages } = assembleRequest(base);
+    expect(messages).toEqual([
       { role: "user", content: "OPT one" },
       { role: "assistant", content: "answer one" },
       { role: "user", content: [{ type: "text", text: "OPT two", providerOptions: CACHE }] },
@@ -351,11 +363,45 @@ describe("assembleRequest", () => {
   });
 
   it("substitutes the optimized prompt for the latest user turn", () => {
-    const out = assembleRequest({ ...base, optimizedPrompt: "REWRITTEN" });
-    const last = out[out.length - 1];
-    expect(last).toEqual({
+    const { messages } = assembleRequest({ ...base, optimizedPrompt: "REWRITTEN" });
+    expect(messages[messages.length - 1]).toEqual({
       role: "user",
       content: [{ type: "text", text: "REWRITTEN", providerOptions: CACHE }],
+    });
+  });
+
+  // The key-free half of the cache tripwire: the AI SDK must accept the shape
+  // (v7 rejects system entries inside `messages`) and both breakpoints must
+  // still be on the prompt the provider receives.
+  it("is accepted by the AI SDK and both breakpoints reach the model prompt", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: {
+        content: [{ type: "text", text: "OK" }],
+        finishReason: { unified: "stop", raw: "end_turn" },
+        usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+          outputTokens: { total: 1, text: 1, reasoning: 0 },
+        },
+        warnings: [],
+      },
+    });
+    const request = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+
+    await expect(generateText({ model, ...request })).resolves.toBeDefined();
+
+    const prompt = model.doGenerateCalls[0].prompt;
+    const system = prompt.filter((m) => m.role === "system");
+    expect(system.map((m) => m.content)).toEqual([
+      "BASE",
+      "<memory>\n- x\n</memory>",
+      "Today is 2026-09-18.",
+    ]);
+    expect(system[0].providerOptions).toBeUndefined();
+    expect(system[1].providerOptions).toEqual(CACHE); // breakpoint A survived
+    expect(system[2].providerOptions).toBeUndefined();
+    expect(prompt[prompt.length - 1]).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "OPT two", providerOptions: CACHE }], // breakpoint B
     });
   });
 });
@@ -368,6 +414,8 @@ Expected: FAIL — cannot resolve `../context`.
 
 - [ ] **Step 3: Create `lib/context.ts`**
 
+The spec (§3) returns the system layer and the turns separately. AI SDK v7 names that option `instructions` and throws `InvalidPromptError` ("System messages are not allowed in the prompt or messages fields. Use the instructions option instead.") for system entries inside `messages`, so the result is `{ instructions, messages }`, spread straight into `streamText`. System `providerOptions` survive the `instructions` path, so breakpoint A still reaches the provider.
+
 ```ts
 /** Request assembly for the answer call (spec §3). One pure function owns the
  *  order of everything the model sees, because Anthropic's prompt cache is a
@@ -379,8 +427,12 @@ Expected: FAIL — cannot resolve `../context`.
  *  Anthropic checks earlier block boundaries for hits, so a new B each turn
  *  still matches the previous prefix. Everything before B must be
  *  byte-identical between turns — buildModelMessages guarantees that by
- *  reading optimized prompts from stored metadata, never re-deriving them. */
-import type { ModelMessage } from "ai";
+ *  reading optimized prompts from stored metadata, never re-deriving them.
+ *
+ *  The result is spread straight into streamText: the system layer goes in
+ *  `instructions` (AI SDK v7 rejects system entries inside `messages`) and
+ *  keeps its providerOptions, so breakpoint A reaches the provider. */
+import type { ModelMessage, SystemModelMessage } from "ai";
 import { buildModelMessages } from "./history";
 import type { EasyUIMessage } from "./types";
 
@@ -399,18 +451,25 @@ export interface AssembleInput {
   today: string;
 }
 
+export interface AssembledRequest {
+  /** System layer, in order; breakpoint A on the last stable entry. */
+  instructions: SystemModelMessage[];
+  /** Conversation turns; breakpoint B on the latest user turn's text part. */
+  messages: ModelMessage[];
+}
+
 export function todayISO(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function assembleRequest(input: AssembleInput): ModelMessage[] {
-  const system: ModelMessage[] = [];
+export function assembleRequest(input: AssembleInput): AssembledRequest {
+  const system: SystemModelMessage[] = [];
   if (input.base) system.push({ role: "system", content: input.base });
-  const instructions = input.instructions?.trim();
-  if (instructions) {
+  const userInstructions = input.instructions?.trim();
+  if (userInstructions) {
     system.push({
       role: "system",
-      content: `<user_instructions>\n${instructions}\n</user_instructions>`,
+      content: `<user_instructions>\n${userInstructions}\n</user_instructions>`,
     });
   }
   if (input.memory?.length) {
@@ -440,14 +499,14 @@ export function assembleRequest(input: AssembleInput): ModelMessage[] {
       content: [{ type: "text", text: turns[last].content, providerOptions: CACHE_BREAKPOINT }],
     };
   }
-  return [...system, ...out];
+  return { instructions: system, messages: out };
 }
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run lib/__tests__/context.test.ts`
-Expected: PASS (8 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 5: Typecheck, lint, commit**
 
@@ -514,12 +573,12 @@ with:
   const run = (model: ModelId) =>
     streamText({
       model: provider(model),
-      messages: assembleRequest({ messages, optimizedPrompt: routing.optimizedPrompt, today }),
+      ...assembleRequest({ messages, optimizedPrompt: routing.optimizedPrompt, today }),
       maxOutputTokens: MAX_OUTPUT_TOKENS[model],
     });
 ```
 
-`run(routing.finalModel)` and `run("claude-opus-5")` below already pass `ModelId`-typed values; no change there.
+`run(routing.finalModel)` and `run("claude-opus-5")` below already pass `ModelId`-typed values; no change there. The spread supplies both `instructions` and `messages`; `messages: assembleRequest(...)` would throw `InvalidPromptError` (Task 3).
 
 - [ ] **Step 3: Carry cache counts in the finish metadata**
 
@@ -651,7 +710,7 @@ function assistant(id: string, text: string, optimizedPrompt: string): EasyUIMes
 async function turn(model: ModelId, messages: EasyUIMessage[], optimizedPrompt: string) {
   const result = streamText({
     model: anthropic(model),
-    messages: assembleRequest({ messages, optimizedPrompt, today: todayISO() }),
+    ...assembleRequest({ messages, optimizedPrompt, today: todayISO() }),
     maxOutputTokens: 20,
   });
   await result.text;
