@@ -59,7 +59,7 @@ export function applyGuardrail(
   // but a follow-up never drops below the tier of the task it continues.
   const cap: ModelId =
     priorModel && RANK[priorModel] > RANK["claude-sonnet-5"] ? priorModel : "claude-sonnet-5";
-  if (words < 15 && !code && questions < 2 && RANK[model] > RANK[cap]) {
+  if (words < REWRITE_MIN_WORDS && !code && questions < 2 && RANK[model] > RANK[cap]) {
     model = cap;
   }
   // Floor: code or long messages never go to Haiku.

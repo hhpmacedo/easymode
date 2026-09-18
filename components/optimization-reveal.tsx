@@ -42,15 +42,27 @@ export function OptimizationReveal({ meta, rawText }: { meta: EasyMetadata; rawT
 
       {open && (
         <div className="space-y-4 border-t border-line px-4 py-4">
-          <section>
-            <Label>Your prompt → optimized</Label>
-            <p className="rounded-lg bg-paper px-3 py-2 text-[13px] whitespace-pre-wrap text-muted line-through decoration-line-strong">
-              {rawText}
-            </p>
-            <p className="mt-1.5 rounded-lg border border-pine/15 bg-pine-soft/50 px-3 py-2 text-[13px] whitespace-pre-wrap text-ink">
-              {routing.optimizedPrompt}
-            </p>
-          </section>
+          {routing.optimizedPrompt === rawText ? (
+            <section>
+              <Label>Your prompt</Label>
+              <p className="rounded-lg bg-paper px-3 py-2 text-[13px] whitespace-pre-wrap text-ink">
+                {rawText}
+              </p>
+              <p className="mt-1.5 text-[12px] text-muted">
+                Sent as written — short messages are never rewritten.
+              </p>
+            </section>
+          ) : (
+            <section>
+              <Label>Your prompt → optimized</Label>
+              <p className="rounded-lg bg-paper px-3 py-2 text-[13px] whitespace-pre-wrap text-muted line-through decoration-line-strong">
+                {rawText}
+              </p>
+              <p className="mt-1.5 rounded-lg border border-pine/15 bg-pine-soft/50 px-3 py-2 text-[13px] whitespace-pre-wrap text-ink">
+                {routing.optimizedPrompt}
+              </p>
+            </section>
+          )}
 
           <section>
             <Label>Routing</Label>

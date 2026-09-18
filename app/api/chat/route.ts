@@ -37,7 +37,9 @@ export async function POST(req: Request) {
   let messages: EasyUIMessage[];
   let context: ChatContext = {};
   try {
-    ({ messages, context = {} } = JSON.parse(raw));
+    const body = JSON.parse(raw);
+    messages = body.messages;
+    context = body.context && typeof body.context === "object" ? body.context : {};
   } catch {
     return Response.json({ error: "Malformed JSON body." }, { status: 400 });
   }

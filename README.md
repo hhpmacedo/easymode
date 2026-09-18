@@ -27,6 +27,13 @@ user turn), and a thread never drops model tiers mid-conversation — the cache
 is per model. Cached input is priced at 10% (reads) / 125% (writes) in the
 cost estimate; the "how?" panel shows how much of each turn came from cache.
 
+Every answer carries a short, versioned base system prompt (`lib/prompts/base.ts`)
+and, if you set them under **Settings → Instructions**, your own standing
+preferences ("how I like answers"). Both sit at the start of the cached prefix, so
+they cost almost nothing per turn. Instructions live in your browser only.
+Messages under 15 words are sent exactly as written; longer ones are tuned into a
+precise prompt first.
+
 ## Scripts
 
     npm test          # unit tests (guardrail, cost math, storage, history)

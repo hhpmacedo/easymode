@@ -31,7 +31,7 @@ test("trivial message routes cheap, reveal opens, savings accumulate", async ({ 
 
   // 2. Reveal panel shows optimized prompt + cost table with Router line.
   await chip.click();
-  await expect(page.getByText("Your prompt → optimized")).toBeVisible();
+  await expect(page.getByText(/Your prompt/)).toBeVisible();
   await expect(page.getByText("Router (Haiku)")).toBeVisible();
 
   // 3. Conversation savings total appears in header.

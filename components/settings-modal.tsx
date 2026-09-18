@@ -90,7 +90,10 @@ function InstructionsPanel() {
       </p>
       <textarea
         value={draft}
-        onChange={(e) => setDraft(e.target.value.slice(0, INSTRUCTIONS_MAX))}
+        onChange={(e) => {
+          setDraft(e.target.value.slice(0, INSTRUCTIONS_MAX));
+          setSavedAt(null);
+        }}
         onBlur={save}
         rows={7}
         maxLength={INSTRUCTIONS_MAX}

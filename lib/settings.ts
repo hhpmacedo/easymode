@@ -23,7 +23,9 @@ export function readSettings(storage: Storage): Settings {
       typeof (parsed as { instructions?: unknown }).instructions === "string"
         ? (parsed as { instructions: string }).instructions
         : DEFAULTS.instructions;
-    return { instructions };
+    // Re-apply the cap on read: a hand-edited or older value must never make
+    // the server reject every send.
+    return { instructions: instructions.trim().slice(0, INSTRUCTIONS_MAX) };
   } catch {
     return { ...DEFAULTS };
   }
@@ -37,7 +39,11 @@ export function writeSettings(storage: Storage, settings: Settings): void {
 /** Client wrappers (safe to call during SSR: they no-op without window). */
 export function getSettings(): Settings {
   if (typeof window === "undefined") return { ...DEFAULTS };
-  return readSettings(window.localStorage);
+  try {
+    return readSettings(window.localStorage);
+  } catch {
+    return { ...DEFAULTS }; // storage blocked (sandboxed iframe, cookies off)
+  }
 }
 
 export function setInstructions(instructions: string): void {
