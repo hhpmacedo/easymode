@@ -147,9 +147,10 @@ export function sessionCookie(req: Request, value: string, maxAgeSec = SESSION_M
 const chatLimiter = new RateLimiter({ limit: 30, windowMs: 10 * 60_000 });
 const loginLimiter = new RateLimiter({ limit: 10, windowMs: 15 * 60_000 });
 const validateLimiter = new RateLimiter({ limit: 20, windowMs: 15 * 60_000 });
-// Background jobs (compaction now, memory extraction next) get their own,
+// Background jobs (compaction, memory extraction) get their own,
 // tighter limiter so a shared-key operator can bound them independently.
 const compactLimiter = new RateLimiter({ limit: 10, windowMs: 15 * 60_000 });
+const extractLimiter = new RateLimiter({ limit: 20, windowMs: 15 * 60_000 });
 
 const CLOSED_MESSAGE =
   "EASYMODE_ACCESS_TOKEN is not configured, so the API is disabled in production. " +
@@ -265,4 +266,9 @@ export function resolveChatAuth(req: Request): ChatAuth {
 /** Same precedence as chat, on the compaction limiter (spec §7.2). */
 export function resolveCompactAuth(req: Request): ChatAuth {
   return resolveAuth(req, compactLimiter);
+}
+
+/** Same precedence as chat, on the memory-extraction limiter (spec §5.3). */
+export function resolveExtractAuth(req: Request): ChatAuth {
+  return resolveAuth(req, extractLimiter);
 }
