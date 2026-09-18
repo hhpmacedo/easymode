@@ -56,6 +56,12 @@ export function useCompaction({
         (data as { summary?: unknown } | null)?.summary,
       );
       if (!summary.success) return; // never store what the schema rejects
+      // The user may have edited (or cleared) the boundary card while the
+      // request was in flight; that summary was our `prior`, so storing this
+      // result would drop their edit. Bail and let the next turn retry from
+      // the edited prior. getMeta re-parses storage, so compare by value.
+      const now = store.getMeta(conversationId)?.compaction;
+      if (JSON.stringify(now) !== JSON.stringify(prior)) return;
       store.setCompaction(conversationId, {
         throughMessageId: choice.throughMessageId,
         summary: summary.data,
