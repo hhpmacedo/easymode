@@ -19,9 +19,8 @@ test("trivial message routes cheap, reveal opens, savings accumulate", async ({ 
   // 3. Conversation savings total appears in header.
   await expect(page.locator("header")).toContainText(/vs always-Opus/, { timeout: 60_000 });
 
-  // 4. Persistence: reload keeps the message.
-  // The sidebar auto-titles the conversation "hi" too, so target the message
-  // bubble (a div whose full text is exactly "hi") rather than any "hi" text.
+  // 4. Persistence: reload keeps the message. Target the message bubble by
+  // testid — the sidebar auto-titles the conversation "hi" too.
   await page.reload();
-  await expect(page.locator("div").filter({ hasText: /^hi$/ })).toBeVisible();
+  await expect(page.getByTestId("user-bubble").filter({ hasText: /^hi$/ })).toBeVisible();
 });

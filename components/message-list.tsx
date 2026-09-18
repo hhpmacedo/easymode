@@ -51,7 +51,10 @@ export function MessageList({ messages, status, error, onRetry }: Props) {
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={m.id} className="animate-rise flex justify-end">
-              <div className="max-w-[80%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] whitespace-pre-wrap text-paper shadow-[0_2px_8px_rgba(29,26,21,0.15)]">
+              <div
+                data-testid="user-bubble"
+                className="max-w-[80%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] whitespace-pre-wrap text-paper shadow-[0_2px_8px_rgba(29,26,21,0.15)]"
+              >
                 {messageText(m)}
               </div>
             </div>
