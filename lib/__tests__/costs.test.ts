@@ -29,6 +29,24 @@ describe("costOf", () => {
       10,
     );
   });
+  it("splits a real cached turn three ways (read + written + fresh)", () => {
+    // 30K total: 26K read + 3K written + 1K fresh, on Haiku ($1/MTok input)
+    const u = {
+      inputTokens: 30_000,
+      outputTokens: 0,
+      cacheReadTokens: 26_000,
+      cacheWriteTokens: 3_000,
+    };
+    expect(costOf("claude-haiku-4-5", u)).toBeCloseTo(
+      (1_000 + 26_000 * 0.1 + 3_000 * 1.25) / 1e6,
+      12,
+    );
+  });
+  it("uses a model's flat cache-read price when it departs from the 10% rule (Fable 5.1)", () => {
+    // 10K read on Fable 5.1: $0.25/MTok, not 10% of $10 → 2,500 not 10,000
+    const u = { inputTokens: 10_000, outputTokens: 0, cacheReadTokens: 10_000 };
+    expect(costOf("claude-fable-5-1", u)).toBeCloseTo(2_500 / 1e6, 12);
+  });
   it("never prices negative uncached tokens if cache counts exceed the total", () => {
     const u = { inputTokens: 100, outputTokens: 0, cacheReadTokens: 200 };
     expect(costOf("claude-haiku-4-5", u)).toBeCloseTo((200 * 0.1) / 1_000_000, 12);
@@ -111,5 +129,8 @@ describe("formatTokens", () => {
   });
   it("shows whole thousands at 10K and above", () => {
     expect(formatTokens(41_300)).toBe("41K");
+  });
+  it("shows millions with one decimal", () => {
+    expect(formatTokens(1_500_000)).toBe("1.5M");
   });
 });

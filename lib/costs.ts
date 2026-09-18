@@ -8,15 +8,17 @@ import {
 import type { ModelId, TokenUsage } from "./types";
 
 /** USD for one call. Cached input is a subset of `inputTokens`: reads are
- *  billed at 10% of the input rate, writes at 125% (spec §3.1). */
+ *  billed at 10% of the input rate (or the model's flat override), writes at
+ *  125% (spec §3.1). */
 export function costOf(model: ModelId, usage: TokenUsage): number {
   const p = PRICING[model];
   const read = usage.cacheReadTokens ?? 0;
   const write = usage.cacheWriteTokens ?? 0;
   const uncached = Math.max(0, usage.inputTokens - read - write);
+  const readPerMTok = p.cacheReadPerMTok ?? p.inputPerMTok * CACHE_READ_MULTIPLIER;
   const input =
     uncached * p.inputPerMTok +
-    read * p.inputPerMTok * CACHE_READ_MULTIPLIER +
+    read * readPerMTok +
     write * p.inputPerMTok * CACHE_WRITE_MULTIPLIER;
   return (input + usage.outputTokens * p.outputPerMTok) / 1_000_000;
 }
@@ -108,9 +110,10 @@ export function formatUSD(n: number): string {
   return `${n < 0 ? "-" : ""}$${abs.toFixed(digits)}`;
 }
 
-/** Compact token count for the UI: 842 · 4.3K · 41K. */
+/** Compact token count for the UI: 842 · 4.3K · 41K · 1.5M. */
 export function formatTokens(n: number): string {
   if (n < 1000) return String(n);
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n < 10_000) return `${(n / 1000).toFixed(1)}K`;
   return `${Math.round(n / 1000)}K`;
 }

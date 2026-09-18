@@ -111,10 +111,23 @@ interface TokenUsage {
 ```
 
 `pricing.ts` gains `CACHE_READ_MULTIPLIER = 0.1` and
-`CACHE_WRITE_MULTIPLIER = 1.25` (5-minute TTL). `costOf` prices
+`CACHE_WRITE_MULTIPLIER = 1.25` (5-minute TTL), plus an optional per-model
+`cacheReadPerMTok` override for models that depart from the 0.1× rule
+(Fable 5.1 reads at a flat $0.25/MTok = 0.025×). `costOf` prices
 `inputTokens − read − write` at full rate and the two cache buckets at their
-multipliers. `turnCosts` keeps its current shape (`tier/amount/pct`). Stored
-conversations without cache fields read as zero → unchanged cost.
+multipliers.
+
+**Known bias in the counterfactual.** `turnCosts` prices the always-baseline
+counterfactual from the _same_ usage split. On steady-state turns that is
+right (same bytes → same cache structure at any model). On the ≤ 2–3
+escalation turns per thread the real call is a per-model cache miss while an
+always-Opus thread would have hit, so those turns read as "matched" instead of
+a small premium. The bias is bounded by the ratchet (escalate-only) and
+flatters the router rather than the user; modelling the counterfactual's own
+cache state would need per-thread simulation and is out of scope.
+
+`turnCosts` keeps its current shape (`tier/amount/pct`). Stored conversations
+without cache fields read as zero → unchanged cost.
 
 The reveal panel shows `input 41K tokens · 38K from cache` per turn. The
 thread size the compaction threshold needs (§6.1) is simply
@@ -396,9 +409,9 @@ Each step ships alone and is useful alone:
 
 ## 11. Open checks
 
-- **Sonnet 5 price.** `pricing.ts` has $3/$15 (marked verified 2026-09-18);
-  the Claude API reference available during this design lists $2/$10. Verify
-  against the pricing page before step 1 — it changes every savings number.
+- ~~Sonnet 5 price~~ — resolved 2026-09-18 against the live pricing page:
+  $2/$10 (the $3/$15 in the table was Sonnet 4.6's rate); Fable 5.1 cache
+  reads are a flat $0.25/MTok. Both fixed in step 1.
 - **Per-model minimum cacheable prefix** for Opus 5 / Sonnet 5 / Fable 5:
   confirm from the prompt-caching docs; the design assumes 4K.
 - `ai`/`@ai-sdk/anthropic` versions in `package.json` expose
