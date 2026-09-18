@@ -24,10 +24,15 @@ describe("settings", () => {
     writeSettings(s, { instructions: "be terse" });
     expect(readSettings(s)).toEqual({ instructions: "be terse" });
   });
+  it("trims surrounding whitespace from instructions", () => {
+    const s = fakeStorage();
+    writeSettings(s, { instructions: "  be terse  " });
+    expect(readSettings(s).instructions).toBe("be terse");
+  });
   it("trims and caps instructions at INSTRUCTIONS_MAX characters", () => {
     const s = fakeStorage();
     writeSettings(s, { instructions: "  " + "x".repeat(INSTRUCTIONS_MAX + 50) + "  " });
-    expect(readSettings(s).instructions).toHaveLength(INSTRUCTIONS_MAX);
+    expect(readSettings(s).instructions).toBe("x".repeat(INSTRUCTIONS_MAX));
   });
   it("falls back to defaults on corrupt or foreign JSON", () => {
     const s = fakeStorage();
