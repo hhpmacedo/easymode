@@ -18,12 +18,18 @@ import { providerFor } from "@/lib/provider";
 
 export const maxDuration = 120;
 
-// Caps on what one request may push through the paid API. The client sends
-// the whole thread (assembleRequest drops pre-boundary turns server-side), so
-// these must clear the 150K-token compaction ceiling: a measured 150K-token
-// thread serialises to ~900K chars over ~650 messages once assistant metadata
-// (routing reasoning, prompt copy) and JSON framing are included. Roughly
-// twice that keeps compaction reachable at every threshold setting.
+// Caps on what one request may push through the paid API. They must clear
+// one compaction cycle's worth of thread: a measured 150K-token thread (the
+// threshold ceiling) serialises to ~900K chars over ~650 messages once
+// assistant metadata (routing reasoning, prompt copy) and JSON framing are
+// included, so roughly twice that. Spec §7.1's 200 KB cap would 413 before
+// the first compaction at any threshold above ~30K tokens (plan deviation 3).
+// These caps only bound a single cycle, though: compacted turns stay in
+// storage, so a client that keeps sending the whole thread outgrows them on
+// its third cycle at the ceiling (fifth or sixth at the 60K default). The
+// transport must send only the turns from `compaction.throughMessageId`
+// onward (the boundary message included, since assembleRequest ignores a
+// boundary it cannot find) for long conversations to keep working.
 const MAX_BODY_BYTES = 2_000_000;
 const MAX_MESSAGES = 1_000;
 

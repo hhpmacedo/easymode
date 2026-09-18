@@ -7,13 +7,15 @@ import type { EasyUIMessage } from "@/lib/types";
 
 export const maxDuration = 60;
 
-// The client sends only the turns to compact, as full UI messages. At the
-// 150K-token threshold ceiling that is ~600K chars of text, but every
-// assistant message also carries metadata (routing reasoning plus a second
-// copy of the user's prompt) and JSON framing, so a measured 150K-token
-// thread serialises to ~900K chars over ~650 messages. Cap at roughly twice
-// that so the ceiling is always reachable; the compaction limiter (10 per
-// 15 min) and Haiku's 200K window bound spend, not these caps.
+// The client sends only the turns to compact (those after the prior boundary,
+// through the new one), as full UI messages, so this body is bounded by one
+// cycle's worth of thread by construction. At the 150K-token threshold ceiling
+// that is ~600K chars of text, but every assistant message also carries
+// metadata (routing reasoning plus a second copy of the user's prompt) and
+// JSON framing, so a measured 150K-token thread serialises to ~900K chars over
+// ~650 messages. Cap at roughly twice that (matching /api/chat; plan deviation
+// 3 — spec §7.1 said 200 KB); the compaction limiter (10 per 15 min) and
+// Haiku's 200K window bound spend, not these caps.
 const MAX_BODY_BYTES = 2_000_000;
 const MAX_MESSAGES = 1_000;
 

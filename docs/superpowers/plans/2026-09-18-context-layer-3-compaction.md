@@ -10,7 +10,7 @@
 
 **Depends on:** plans 1–2 (branch `feat/context-layer-2-system-prompt`, PR #13): `assembleRequest`, `ChatContext`, `lib/settings.ts`, the tabbed Settings modal.
 
-**Spec deviations, decided here:** (1) threshold range is 30K–150K (spec said 200K) so the compaction input always fits the Haiku 4.5 window; (2) `lib/history.ts` is not folded into `context.ts` — `assembleRequest` slices the thread before calling `buildModelMessages`, which is smaller and keeps history's tests intact.
+**Spec deviations, decided here:** (1) threshold range is 30K–150K (spec said 200K) so the compaction input always fits the Haiku 4.5 window; (2) `lib/history.ts` is not folded into `context.ts` — `assembleRequest` slices the thread before calling `buildModelMessages`, which is smaller and keeps history's tests intact; (3) the `/api/chat` and `/api/compact` body caps are 2 MB / 1,000 messages, not the 200 KB / 200 the spec §7.1 keeps — a measured 150K-token thread serialises to ~900K chars over ~650 messages, so the spec cap would 413 before the first compaction at any threshold above ~30K. The caps bound one cycle only; the chat transport must therefore send just the turns from `throughMessageId` onward (Task 5, Step 4), otherwise the ever-growing stored thread outgrows them on the third cycle at the ceiling.
 
 ---
 
@@ -1219,6 +1219,18 @@ Transport body — include the compaction (read at send time from the store):
       },
 ```
 
+Send only the turns the server needs (spec deviation 3): the stored thread keeps every compacted turn, so posting all of it outgrows the 2 MB / 1,000-message caps after a few cycles. Slice in `prepareSendMessagesRequest` from the boundary message **inclusive** — `assembleRequest` ignores a `throughMessageId` it cannot find, so dropping the boundary message itself would silently send the full thread:
+
+```ts
+      prepareSendMessagesRequest: ({ messages, body }) => {
+        const c = store.getMeta(conversationId)?.compaction;
+        const idx = c ? messages.findIndex((m) => m.id === c.throughMessageId) : -1;
+        return { body: { ...body, messages: idx > 0 ? messages.slice(idx) : messages } };
+      },
+```
+
+(`body` here is the object the `body()` above produced. If the installed `ai` version names this hook differently, read `node_modules/ai/dist/index.d.ts` for `DefaultChatTransport` and use its request-preparing option.)
+
 After the `useChat` call, add a small version counter so a store change re-renders the card, then the hook:
 
 ```ts
@@ -1354,7 +1366,7 @@ and pass `compaction,` into the `assembleRequest({ … })` call in `run` (after 
 
 - [ ] **Step 2: Spec notes**
 
-In the spec: §6.1 change "range 30K–200K" to "range 30K–150K (so the compaction input fits the Haiku 4.5 window)"; in §7.1 change the note "`lib/history.ts` folds into `lib/context.ts`" to "`lib/history.ts` stays; `assembleRequest` slices the thread at the boundary before calling it".
+In the spec: §6.1 change "range 30K–200K" to "range 30K–150K (so the compaction input fits the Haiku 4.5 window)"; in §7.1 change the note "`lib/history.ts` folds into `lib/context.ts`" to "`lib/history.ts` stays; `assembleRequest` slices the thread at the boundary before calling it", and change "200 KB body cap stays" to "body cap is 2 MB / 1,000 messages so one compaction cycle's worth of thread fits; the client sends only the turns from the boundary onward" (plan deviation 3).
 
 - [ ] **Step 3: Typecheck, lint, commit**
 
