@@ -1,9 +1,12 @@
 import { streamText } from "ai";
-import { classify, applyGuardrail, atLeastTier, priorTier } from "@/lib/router";
+import { classify, applyGuardrail, atLeastTier, priorTier, rewriteGuard } from "@/lib/router";
 import { latestUserText } from "@/lib/history";
 import { assembleRequest, todayISO } from "@/lib/context";
 import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
+import { BASE_PROMPT, PROMPT_VERSION } from "@/lib/prompts/base";
+import { INSTRUCTIONS_MAX } from "@/lib/settings";
 import type {
+  ChatContext,
   EasyMetadata,
   EasyUIMessage,
   ModelId,
@@ -32,13 +35,29 @@ export async function POST(req: Request) {
     return Response.json({ error: "Request body too large." }, { status: 413 });
   }
   let messages: EasyUIMessage[];
+  let context: ChatContext = {};
   try {
-    ({ messages } = JSON.parse(raw));
+    const body = JSON.parse(raw);
+    messages = body.messages;
+    context = body.context && typeof body.context === "object" ? body.context : {};
   } catch {
     return Response.json({ error: "Malformed JSON body." }, { status: 400 });
   }
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
     return Response.json({ error: "Expected 1–200 messages." }, { status: 400 });
+  }
+  // The client owns instructions (spec §7.4); the server only bounds them.
+  const instructions = typeof context.instructions === "string" ? context.instructions : "";
+  if (instructions.length > INSTRUCTIONS_MAX) {
+    return Response.json(
+      { error: `Instructions are limited to ${INSTRUCTIONS_MAX} characters.` },
+      { status: 400 },
+    );
+  }
+  if (context.promptVersion && context.promptVersion !== PROMPT_VERSION) {
+    console.warn(
+      `[easymode] client prompt version ${context.promptVersion} ≠ server ${PROMPT_VERSION}`,
+    );
   }
   const rawText = latestUserText(messages);
   const history = messages.slice(0, -1); // context for the classifier
@@ -55,7 +74,13 @@ export async function POST(req: Request) {
       rawText,
       prior,
     );
-    routing = { ...decision, finalModel: model, guardrailApplied: applied, fallback: false };
+    routing = {
+      ...decision,
+      optimizedPrompt: rewriteGuard(rawText, decision.optimizedPrompt),
+      finalModel: model,
+      guardrailApplied: applied,
+      fallback: false,
+    };
     classifierUsage = usage;
   } catch (err) {
     console.error("[easymode] classifier failed:", err);
@@ -81,7 +106,13 @@ export async function POST(req: Request) {
   const run = (model: ModelId) =>
     streamText({
       model: provider(model),
-      ...assembleRequest({ messages, optimizedPrompt: routing.optimizedPrompt, today }),
+      ...assembleRequest({
+        base: BASE_PROMPT,
+        instructions,
+        messages,
+        optimizedPrompt: routing.optimizedPrompt,
+        today,
+      }),
       maxOutputTokens: MAX_OUTPUT_TOKENS[model],
     });
 
@@ -123,6 +154,7 @@ export async function POST(req: Request) {
       if (part.type === "finish") {
         const u = part.totalUsage;
         return {
+          promptVersion: PROMPT_VERSION,
           usage: {
             inputTokens: u.inputTokens ?? 0,
             outputTokens: u.outputTokens ?? 0,

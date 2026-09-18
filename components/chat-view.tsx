@@ -4,10 +4,12 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageList } from "./message-list";
 import { Composer } from "./composer";
-import { KeySettings } from "./key-settings";
+import { SettingsModal, type SettingsTab } from "./settings-modal";
 import { turnCosts, conversationSavings, formatUSD } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
+import { getSettings } from "@/lib/settings";
+import { PROMPT_VERSION } from "@/lib/prompts/base";
 import type { ConversationStore } from "@/lib/storage";
 import type { EasyUIMessage } from "@/lib/types";
 
@@ -19,7 +21,8 @@ interface Props {
 }
 
 export function ChatView({ conversationId, initialMessages, store, onMessagesChanged }: Props) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // null = closed; otherwise which tab to open on.
+  const [settings, setSettings] = useState<SettingsTab | null>(null);
   const [hasUserKey, setHasUserKey] = useState<boolean>(() => !!getUserKey());
   // A suggestion clicked before a key is connected: send it once they connect.
   const pendingRef = useRef<string | null>(null);
@@ -35,6 +38,11 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         const key = getUserKey();
         return key ? { "x-anthropic-key": key } : {};
       },
+      // Context rides with every send (spec §7.1). Read at send time so an
+      // edit in Settings applies to the next message with no reload.
+      body: () => ({
+        context: { instructions: getSettings().instructions, promptVersion: PROMPT_VERSION },
+      }),
     }),
   });
 
@@ -47,7 +55,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
       if (has && pendingRef.current) {
         const text = pendingRef.current;
         pendingRef.current = null;
-        setSettingsOpen(false);
+        setSettings(null);
         sendMessage({ text });
       }
     };
@@ -61,7 +69,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
     if (getUserKey()) sendMessage({ text });
     else {
       pendingRef.current = text;
-      setSettingsOpen(true);
+      setSettings("key");
     }
   };
 
@@ -95,11 +103,11 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
             Conversation
           </h1>
           <button
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => setSettings("key")}
             className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
-            title="Connect your Anthropic key"
+            title="Settings: API key, instructions"
           >
-            API key
+            Settings
           </button>
         </div>
         {total.hasTurns && (
@@ -134,11 +142,11 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         error={error}
         onRetry={() => regenerate()}
         needsKey={!hasUserKey}
-        onConnectKey={() => setSettingsOpen(true)}
+        onConnectKey={() => setSettings("key")}
         onSuggestion={onSuggestion}
       />
       <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
-      {settingsOpen && <KeySettings onClose={() => setSettingsOpen(false)} />}
+      {settings && <SettingsModal initialTab={settings} onClose={() => setSettings(null)} />}
     </div>
   );
 }

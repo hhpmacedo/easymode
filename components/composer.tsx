@@ -40,8 +40,8 @@ export function Composer({
         </button>
       </div>
       <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted">
-        Your message is rewritten into an excellent prompt, then routed to the cheapest capable
-        model.
+        Every message is routed to the cheapest capable model; longer ones are tuned into a precise
+        prompt first.
       </p>
     </div>
   );
