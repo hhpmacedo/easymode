@@ -8,6 +8,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "eval": "tsx scripts/run-eval.ts",
+    "eval:cache": "tsx scripts/check-cache.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
