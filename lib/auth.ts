@@ -147,6 +147,9 @@ export function sessionCookie(req: Request, value: string, maxAgeSec = SESSION_M
 const chatLimiter = new RateLimiter({ limit: 30, windowMs: 10 * 60_000 });
 const loginLimiter = new RateLimiter({ limit: 10, windowMs: 15 * 60_000 });
 const validateLimiter = new RateLimiter({ limit: 20, windowMs: 15 * 60_000 });
+// Background jobs (compaction now, memory extraction next) get their own,
+// tighter limiter so a shared-key operator can bound them independently.
+const compactLimiter = new RateLimiter({ limit: 10, windowMs: 15 * 60_000 });
 
 const CLOSED_MESSAGE =
   "EASYMODE_ACCESS_TOKEN is not configured, so the API is disabled in production. " +
@@ -162,11 +165,11 @@ export function guardClosed(): Response | null {
 }
 
 /** Returns a response to send instead of the handler when access is denied. */
-export function guardChat(req: Request): Response | null {
+export function guardChat(req: Request, limiter: RateLimiter = chatLimiter): Response | null {
   const closed = guardClosed();
   if (closed) return closed;
   if (!isAuthenticated(req)) return json(401, { error: "Access token required." });
-  const verdict = chatLimiter.check(clientKey(req));
+  const verdict = limiter.check(clientKey(req));
   if (!verdict.allowed) {
     return json(
       429,
@@ -226,18 +229,10 @@ export interface ChatAuth {
   apiKey?: string;
 }
 
-/** Decide who pays for a chat request and whether it may proceed.
- *
- *  Precedence:
- *  1. The caller brought its own key → bill them; bypass the shared-key gate
- *     (they can't spend our credit), but still rate-limit to protect the proxy.
- *  2. No user key, a server key is configured → shared mode: full access-token
- *     gate (guardChat) and bill our env key.
- *  3. Neither → nothing to serve: 400 telling them to connect a key. */
-export function resolveChatAuth(req: Request): ChatAuth {
+function resolveAuth(req: Request, limiter: RateLimiter): ChatAuth {
   const userKey = extractUserKey(req);
   if (userKey) {
-    const verdict = chatLimiter.check(clientKey(req));
+    const verdict = limiter.check(clientKey(req));
     if (!verdict.allowed) {
       return {
         denied: json(
@@ -250,7 +245,24 @@ export function resolveChatAuth(req: Request): ChatAuth {
     return { denied: null, apiKey: userKey };
   }
   if (hasServerKey()) {
-    return { denied: guardChat(req), apiKey: undefined };
+    return { denied: guardChat(req, limiter), apiKey: undefined };
   }
   return { denied: json(400, { error: CONNECT_MESSAGE }) };
+}
+
+/** Decide who pays for a chat request and whether it may proceed.
+ *
+ *  Precedence:
+ *  1. The caller brought its own key → bill them; bypass the shared-key gate
+ *     (they can't spend our credit), but still rate-limit to protect the proxy.
+ *  2. No user key, a server key is configured → shared mode: full access-token
+ *     gate (guardChat) and bill our env key.
+ *  3. Neither → nothing to serve: 400 telling them to connect a key. */
+export function resolveChatAuth(req: Request): ChatAuth {
+  return resolveAuth(req, chatLimiter);
+}
+
+/** Same precedence as chat, on the compaction limiter (spec §7.2). */
+export function resolveCompactAuth(req: Request): ChatAuth {
+  return resolveAuth(req, compactLimiter);
 }
