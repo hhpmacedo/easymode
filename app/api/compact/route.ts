@@ -1,6 +1,6 @@
 import { resolveCompactAuth } from "@/lib/auth";
 import { providerFor } from "@/lib/provider";
-import { readJsonBody, runJob } from "@/lib/api-helpers";
+import { logJobError, readJsonBody, runJob } from "@/lib/api-helpers";
 import { compactionSummarySchema } from "@/lib/compaction";
 import { COMPACTION_SYSTEM, buildCompactionPrompt } from "@/lib/prompts/compaction";
 import type { EasyUIMessage } from "@/lib/types";
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     );
     return Response.json({ summary: result, usage });
   } catch (err) {
-    console.error("[easymode] compaction failed:", err);
+    logJobError("compaction failed", err);
     return Response.json(
       { error: "Compaction failed. It will be retried later." },
       { status: 502 },

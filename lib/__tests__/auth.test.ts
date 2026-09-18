@@ -11,6 +11,7 @@ import {
   extractUserKey,
   resolveChatAuth,
   resolveCompactAuth,
+  resolveExtractAuth,
   doorState,
 } from "../auth";
 
@@ -188,5 +189,20 @@ describe("resolveCompactAuth", () => {
     expect(last.denied?.status).toBe(429);
     // Chat is untouched by the compaction limiter.
     expect(resolveChatAuth(mk()).denied).toBeNull();
+  });
+});
+
+describe("resolveExtractAuth", () => {
+  it("rate-limits per client independently (20 per 15 minutes)", () => {
+    const key = "sk-ant-" + "c".repeat(30);
+    const mk = () =>
+      new Request("http://localhost/api/memory/extract", {
+        headers: { "x-anthropic-key": key, "x-forwarded-for": "10.0.0.11" },
+      });
+    let last = resolveExtractAuth(mk());
+    for (let i = 0; i < 20; i++) last = resolveExtractAuth(mk());
+    expect(last.denied?.status).toBe(429);
+    expect(resolveChatAuth(mk()).denied).toBeNull();
+    expect(resolveCompactAuth(mk()).denied).toBeNull();
   });
 });

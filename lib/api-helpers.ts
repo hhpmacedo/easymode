@@ -44,3 +44,13 @@ export async function runJob<T>(
     usage: { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 },
   };
 }
+
+/** Log a failure WITHOUT its payload. AI SDK errors carry the full request
+ *  (system prompt, turns, memories — `requestBodyValues`) and any raw model
+ *  text on the error object, so a bare console.error(err) would put a user's
+ *  transcript in the server logs. Name + message is enough to diagnose. */
+export function logJobError(tag: string, err: unknown): void {
+  const name = err instanceof Error ? err.name : typeof err;
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`[easymode] ${tag}: ${name}: ${message.slice(0, 300)}`);
+}

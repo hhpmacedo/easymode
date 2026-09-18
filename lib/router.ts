@@ -3,6 +3,8 @@ import { anthropic } from "@ai-sdk/anthropic";
 import type { AnthropicProvider } from "./provider";
 import { z } from "zod";
 import { CLASSIFIER_MODEL, PRICING } from "./pricing";
+import { estimateTokens } from "./compaction";
+import { CLASSIFIER_MEMORY_TOKENS } from "./memory";
 import { COMPLEXITIES, MODEL_IDS, messageText } from "./types";
 import type { Complexity, EasyUIMessage, ModelId, TokenUsage } from "./types";
 
@@ -110,15 +112,26 @@ export function priorTier(history: EasyUIMessage[]): ModelId | undefined {
   return undefined;
 }
 
-/** Build classifier input: last 4 turns (truncated) + the new message. */
-export function buildClassifierPrompt(history: EasyUIMessage[], rawText: string): string {
+/** Build classifier input: (short memory) + last 4 turns (truncated) + the new
+ *  message. Memory is included only when it is short (spec §4.5) — "prefers
+ *  concise answers" can inform routing without paying to send all of it. */
+export function buildClassifierPrompt(
+  history: EasyUIMessage[],
+  rawText: string,
+  memoryLines: string[] = [],
+): string {
+  const memTokens = memoryLines.reduce((n, l) => n + estimateTokens(l) + 1, 0);
+  const memory =
+    memoryLines.length && memTokens <= CLASSIFIER_MEMORY_TOKENS
+      ? `About the user:\n${memoryLines.map((l) => `- ${l}`).join("\n")}\n\n`
+      : "";
   const recent = history.slice(-4).map((m) => {
     const text = messageText(m);
     const clipped = text.length > 500 ? text.slice(0, 500) + " […]" : text;
     return `${m.role === "user" ? "USER" : "ASSISTANT"}: ${clipped}`;
   });
   const context = recent.length ? `Conversation so far:\n${recent.join("\n")}\n\n` : "";
-  return `${context}NEW USER MESSAGE:\n${rawText}`;
+  return `${memory}${context}NEW USER MESSAGE:\n${rawText}`;
 }
 
 export interface ClassifyResult {
@@ -132,12 +145,13 @@ export async function classify(
   history: EasyUIMessage[],
   rawText: string,
   provider: AnthropicProvider = anthropic,
+  memoryLines: string[] = [],
 ): Promise<ClassifyResult> {
   const { object, usage } = await generateObject({
     model: provider(CLASSIFIER_MODEL),
     schema: classifierSchema,
     system: CLASSIFIER_SYSTEM,
-    prompt: buildClassifierPrompt(history, rawText),
+    prompt: buildClassifierPrompt(history, rawText, memoryLines),
     abortSignal: AbortSignal.timeout(15_000),
   });
   return {

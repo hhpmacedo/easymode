@@ -6,13 +6,17 @@ import { MessageList } from "./message-list";
 import { Composer } from "./composer";
 import { SettingsModal, type SettingsTab } from "./settings-modal";
 import { useCompaction } from "./use-compaction";
+import { useMemoryExtraction, MEMORY_ADDED_EVENT } from "./use-memory-extraction";
+import { MemoryToast } from "./memory-toast";
 import { turnCosts, conversationSavings, formatUSD, formatTokens } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
 import { getSettings } from "@/lib/settings";
 import { PROMPT_VERSION } from "@/lib/prompts/base";
+import { browserMemoryStore } from "@/lib/memory-store";
+import { memoryLines, parseRememberCommand } from "@/lib/memory";
 import type { ConversationStore } from "@/lib/storage";
-import type { CompactionSummary, EasyUIMessage } from "@/lib/types";
+import type { CompactionSummary, EasyUIMessage, Memory } from "@/lib/types";
 
 interface Props {
   conversationId: string;
@@ -27,6 +31,8 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
   const [hasUserKey, setHasUserKey] = useState<boolean>(() => !!getUserKey());
   // A suggestion clicked before a key is connected: send it once they connect.
   const pendingRef = useRef<string | null>(null);
+  // One store instance per view; it reads localStorage on every call.
+  const [memoryStore] = useState(() => browserMemoryStore());
 
   const { messages, sendMessage, status, error, regenerate } = useChat<EasyUIMessage>({
     id: conversationId,
@@ -47,6 +53,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           context: {
             instructions: getSettings().instructions,
             promptVersion: PROMPT_VERSION,
+            ...(getSettings().memoryEnabled ? { memory: memoryLines(memoryStore.active()) } : {}),
             ...(c
               ? { compaction: { throughMessageId: c.throughMessageId, summary: c.summary } }
               : {}),
@@ -86,6 +93,19 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
     store,
     onChanged: onMetaChanged,
   });
+  useMemoryExtraction({ conversationId, messages, status, store, memoryStore });
+
+  // `remember: …` saves an explicit memory, then sends the rest (spec §5.5).
+  const send = (text: string) => {
+    const cmd = parseRememberCommand(text);
+    if (cmd) {
+      const m = memoryStore.add(cmd.memory, "fact", "user");
+      window.dispatchEvent(new CustomEvent<Memory[]>(MEMORY_ADDED_EVENT, { detail: [m] }));
+      sendMessage({ text: cmd.rest });
+      return;
+    }
+    sendMessage({ text });
+  };
   const compaction = useMemo(
     () => store.getMeta(conversationId)?.compaction,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- metaVersion is the invalidation signal
@@ -156,7 +176,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           <button
             onClick={() => setSettings("key")}
             className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
-            title="Settings: API key, instructions"
+            title="Settings: API key, instructions, memory, context"
           >
             Settings
           </button>
@@ -217,7 +237,8 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         compaction={compaction}
         onSaveCompaction={saveCompaction}
       />
-      <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
+      <Composer disabled={busy} onSend={send} />
+      <MemoryToast memoryStore={memoryStore} />
       {settings && <SettingsModal initialTab={settings} onClose={() => setSettings(null)} />}
     </div>
   );

@@ -3,6 +3,7 @@ import { classify, applyGuardrail, atLeastTier, priorTier, rewriteGuard } from "
 import { latestUserText } from "@/lib/history";
 import { assembleRequest, todayISO } from "@/lib/context";
 import { parseCompactionContext } from "@/lib/compaction";
+import { MEMORY_CAP_TOKENS, normalizeMemoryText } from "@/lib/memory";
 import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
 import { BASE_PROMPT, PROMPT_VERSION } from "@/lib/prompts/base";
 import { INSTRUCTIONS_MAX } from "@/lib/settings";
@@ -15,6 +16,7 @@ import type {
   TokenUsage,
 } from "@/lib/types";
 import { resolveChatAuth } from "@/lib/auth";
+import { logJobError } from "@/lib/api-helpers";
 import { providerFor } from "@/lib/provider";
 
 export const maxDuration = 120;
@@ -68,6 +70,19 @@ export async function POST(req: Request) {
   // A malformed compaction is ignored, not rejected: the client owns it and
   // the worst case is sending the full thread (spec §6.3, §7.4).
   const compaction = parseCompactionContext(context.compaction);
+  // Memory lines: the client's own context, bounded here (spec §4.3, §7.4).
+  // Anything malformed or oversized is dropped, not rejected.
+  // normalizeMemoryText collapses whitespace (so no line can contain a
+  // newline and break out of the <memory> block) and caps the length.
+  const memory = Array.isArray(context.memory)
+    ? (context.memory as unknown[])
+        .filter((l): l is string => typeof l === "string")
+        .map((l) => normalizeMemoryText(l))
+        .filter((l) => l.length > 0)
+        .slice(0, 200)
+    : [];
+  const memoryChars = memory.reduce((n, l) => n + l.length, 0);
+  const memoryLines = memoryChars / 4 <= MEMORY_CAP_TOKENS * 1.1 ? memory : [];
   if (context.promptVersion && context.promptVersion !== PROMPT_VERSION) {
     console.warn(
       `[easymode] client prompt version ${context.promptVersion} ≠ server ${PROMPT_VERSION}`,
@@ -81,7 +96,7 @@ export async function POST(req: Request) {
   let routing: RoutingDecision;
   let classifierUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   try {
-    const { decision, usage } = await classify(history, rawText, provider);
+    const { decision, usage } = await classify(history, rawText, provider, memoryLines);
     const { model, applied } = applyGuardrail(
       decision.chosenModel,
       decision.complexity,
@@ -97,7 +112,7 @@ export async function POST(req: Request) {
     };
     classifierUsage = usage;
   } catch (err) {
-    console.error("[easymode] classifier failed:", err);
+    logJobError("classifier failed", err);
     // The fallback still honours the ratchet: dropping an Opus thread to Sonnet
     // would forfeit its cache and reset the floor for every later turn.
     const fallbackModel = atLeastTier(DEFAULT_FALLBACK_MODEL, prior);
@@ -123,6 +138,7 @@ export async function POST(req: Request) {
       ...assembleRequest({
         base: BASE_PROMPT,
         instructions,
+        memory: memoryLines,
         compaction,
         messages,
         optimizedPrompt: routing.optimizedPrompt,
@@ -160,7 +176,7 @@ export async function POST(req: Request) {
     // which makes failures (bad key, overload, network) undiagnosable from the
     // UI. Log the full error server-side and surface a terse cause client-side.
     onError: (error) => {
-      console.error("[easymode] answer stream failed:", error);
+      logJobError("answer stream failed", error);
       const message = error instanceof Error ? error.message : String(error);
       return `Model call failed: ${message.slice(0, 200)}`;
     },
