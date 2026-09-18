@@ -1,22 +1,45 @@
 "use client";
 import { formatUSD } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
+import type { SavingsTier } from "@/lib/costs";
 
-export function SavingsBadge({ savings, pct }: { savings: number; pct: number }) {
-  const positive = savings >= 0;
+const BASE = PRICING[BASELINE_MODEL].label;
+
+export function SavingsBadge({
+  tier,
+  amount,
+  pct,
+}: {
+  tier: SavingsTier;
+  amount: number;
+  pct: number;
+}) {
+  const style =
+    tier === "saved"
+      ? "border-pine/20 bg-pine-soft text-pine-deep"
+      : tier === "premium"
+        ? "border-amber/20 bg-amber-soft text-amber"
+        : "border-line bg-paper text-muted";
+
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
-        positive
-          ? "border-pine/20 bg-pine-soft text-pine-deep"
-          : "border-amber/20 bg-amber-soft text-amber"
-      }`}
-      title={`Estimated vs always using ${PRICING[BASELINE_MODEL].label}, holding output length constant. Includes router cost.`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${style}`}
+      title={
+        tier === "matched"
+          ? `${BASE} was the cheapest model that would do the job — no savings possible, and no premium.`
+          : `Estimated vs always using ${BASE}, holding output length constant. Includes router cost.`
+      }
     >
-      <span className="font-medium">{positive ? "saved" : "premium"}</span>
-      <span className="tabular">
-        {formatUSD(Math.abs(savings))} ({Math.abs(pct).toFixed(0)}%)
-      </span>
+      {tier === "matched" ? (
+        <span className="font-medium">top model — no cheaper option</span>
+      ) : (
+        <>
+          <span className="font-medium">{tier === "saved" ? "saved" : "premium"}</span>
+          <span className="tabular">
+            {formatUSD(amount)} ({pct.toFixed(0)}%)
+          </span>
+        </>
+      )}
       <span className="text-[10px] uppercase tracking-wider opacity-60">est</span>
     </span>
   );
