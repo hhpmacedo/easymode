@@ -55,6 +55,11 @@ describe("isNearDuplicate", () => {
     expect(isNearDuplicate("Wants concise answers", "Wants detailed answers")).toBe(false);
     expect(isNearDuplicate("Uses Python 3", "Uses Python 2")).toBe(false);
     expect(isNearDuplicate("Team of 4", "Team of 40")).toBe(false);
+    // Same words, opposite fact: order is content.
+    expect(isNearDuplicate("Prefers tabs over spaces", "Prefers spaces over tabs")).toBe(false);
+    expect(isNearDuplicate("Moved from Lisbon to London", "Moved from London to Lisbon")).toBe(
+      false,
+    );
   });
   it("does not match a shared sentence template that differs in one fact word", () => {
     expect(isNearDuplicate("Lives in beautiful Lisbon", "Lives in beautiful London")).toBe(false);

@@ -66,15 +66,21 @@ const STOP_WORDS = new Set([
   "is",
 ]);
 
-/** Every token counts, however short: "R", "Go", "C" and version numbers are
- *  the whole difference between distinct facts. */
-function words(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length > 0 && !STOP_WORDS.has(w)),
-  );
+/** Content words in the order written. Every token counts, however short:
+ *  "R", "Go", "C" and version numbers are the whole difference between
+ *  distinct facts. */
+function words(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length > 0 && !STOP_WORDS.has(w));
+}
+
+/** Whether `inner` appears in `outer` in the same order (gaps allowed). */
+function isSubsequence(inner: string[], outer: string[]): boolean {
+  let i = 0;
+  for (const w of outer) if (i < inner.length && w === inner[i]) i++;
+  return i === inner.length;
 }
 
 const NEGATION = /\b(?:not|no|never)\b|n't\b/;
@@ -87,22 +93,29 @@ const NEAR_DUPLICATE_OVERLAP = 0.8;
 
 const HAS_DIGIT = /\p{N}/u;
 
-/** Same fact in different words: one's words contain the other's (same fact,
- *  more detail), or the word sets overlap heavily and the words that differ
- *  are not numbers — a version or a count that differs is a different fact.
- *  Word-set, not substring, so "Uses R" is not inside "Uses React". A negated
- *  and a non-negated sentence are never the same fact. */
+/** Same fact in different words: one's words contain the other's in order
+ *  (same fact, more detail), or the word sets overlap heavily and the words
+ *  that differ are not numbers — a version or a count that differs is a
+ *  different fact. Order is content: "Prefers tabs over spaces" and "Prefers
+ *  spaces over tabs" share every word and are opposite facts, so a pair whose
+ *  word sets nest but whose order differs is never a match. Whole words, not
+ *  substrings, so "Uses R" is not inside "Uses React". A negated and a
+ *  non-negated sentence are never the same fact. */
 export function isNearDuplicate(a: string, b: string): boolean {
   const na = normalizeMemoryText(a).toLowerCase();
   const nb = normalizeMemoryText(b).toLowerCase();
   if (!na || !nb) return false;
   if (NEGATION.test(na) !== NEGATION.test(nb)) return false;
-  const wa = words(na);
-  const wb = words(nb);
-  if (!wa.size || !wb.size) return false;
+  const ta = words(na);
+  const tb = words(nb);
+  if (!ta.length || !tb.length) return false;
+  const wa = new Set(ta);
+  const wb = new Set(tb);
   let shared = 0;
   for (const w of wa) if (wb.has(w)) shared++;
-  if (shared === wa.size || shared === wb.size) return true;
+  if (shared === wa.size || shared === wb.size) {
+    return isSubsequence(ta, tb) || isSubsequence(tb, ta);
+  }
   if (shared / (wa.size + wb.size - shared) < NEAR_DUPLICATE_OVERLAP) return false;
   for (const w of wa) if (!wb.has(w) && HAS_DIGIT.test(w)) return false;
   for (const w of wb) if (!wa.has(w) && HAS_DIGIT.test(w)) return false;
