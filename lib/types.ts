@@ -36,12 +36,22 @@ export interface RoutingDecision {
   fallback: boolean; // true when classifier failed and we defaulted
 }
 
+/** Per-request context the client sends with the messages (spec §7.1).
+ *  Local-first: the browser owns instructions; the server only validates. */
+export interface ChatContext {
+  instructions?: string;
+  /** The PROMPT_VERSION the client was built against; the server logs a mismatch. */
+  promptVersion?: string;
+}
+
 /** Metadata attached to each assistant UI message. `routing`+`classifierUsage`
  *  arrive at stream start; `usage` at stream finish. */
 export interface EasyMetadata {
   routing?: RoutingDecision;
   classifierUsage?: TokenUsage;
   usage?: TokenUsage;
+  /** Base-prompt version the answer was generated with (arrives at finish). */
+  promptVersion?: string;
 }
 
 export type EasyUIMessage = UIMessage<EasyMetadata>;
