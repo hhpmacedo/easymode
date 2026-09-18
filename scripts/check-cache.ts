@@ -30,7 +30,7 @@ function assistant(id: string, text: string, optimizedPrompt: string): EasyUIMes
 async function turn(model: ModelId, messages: EasyUIMessage[], optimizedPrompt: string) {
   const result = streamText({
     model: anthropic(model),
-    messages: assembleRequest({ messages, optimizedPrompt, today: todayISO() }),
+    ...assembleRequest({ messages, optimizedPrompt, today: todayISO() }),
     maxOutputTokens: 20,
   });
   await result.text;

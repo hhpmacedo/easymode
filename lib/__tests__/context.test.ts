@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { generateText } from "ai";
+import { MockLanguageModelV3 } from "ai/test";
 import { assembleRequest, todayISO } from "../context";
 import type { EasyUIMessage } from "../types";
 
@@ -33,21 +35,19 @@ describe("assembleRequest", () => {
     expect(JSON.stringify(assembleRequest(base))).toBe(JSON.stringify(assembleRequest(base)));
   });
 
-  it("with no instruction layer, system is just the date, and it carries no breakpoint", () => {
-    const out = assembleRequest(base);
-    const system = out.filter((m) => m.role === "system");
-    expect(system).toEqual([{ role: "system", content: "Today is 2026-09-18." }]);
+  it("with no instruction layer, instructions is just the date, and it carries no breakpoint", () => {
+    const { instructions } = assembleRequest(base);
+    expect(instructions).toEqual([{ role: "system", content: "Today is 2026-09-18." }]);
   });
 
-  it("orders system entries base → instructions → memory → date", () => {
-    const out = assembleRequest({
+  it("orders instructions base → user instructions → memory → date", () => {
+    const { instructions } = assembleRequest({
       ...base,
       base: "BASE",
       instructions: "  be terse  ",
       memory: ["prefers pnpm", "works in TS"],
     });
-    const system = out.filter((m) => m.role === "system").map((m) => m.content);
-    expect(system).toEqual([
+    expect(instructions.map((m) => m.content)).toEqual([
       "BASE",
       "<user_instructions>\nbe terse\n</user_instructions>",
       "<memory>\n- prefers pnpm\n- works in TS\n</memory>",
@@ -56,22 +56,30 @@ describe("assembleRequest", () => {
   });
 
   it("omits empty blocks so the prefix matches the no-instructions case", () => {
-    const out = assembleRequest({ ...base, base: "", instructions: "   ", memory: [] });
-    expect(out.filter((m) => m.role === "system")).toHaveLength(1);
+    const { instructions } = assembleRequest({
+      ...base,
+      base: "",
+      instructions: "   ",
+      memory: [],
+    });
+    expect(instructions).toHaveLength(1);
   });
 
-  it("puts breakpoint A on the last stable system entry, never on the date", () => {
-    const out = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
-    const system = out.filter((m) => m.role === "system");
-    expect(system[0].providerOptions).toBeUndefined(); // BASE
-    expect(system[1].providerOptions).toEqual(CACHE); // memory (last stable)
-    expect(system[2].providerOptions).toBeUndefined(); // date
+  it("puts breakpoint A on the last stable instruction entry, never on the date", () => {
+    const { instructions } = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+    expect(instructions[0].providerOptions).toBeUndefined(); // BASE
+    expect(instructions[1].providerOptions).toEqual(CACHE); // memory (last stable)
+    expect(instructions[2].providerOptions).toBeUndefined(); // date
+  });
+
+  it("keeps system entries out of messages (the AI SDK rejects them there)", () => {
+    const { messages } = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+    expect(messages.some((m) => m.role === "system")).toBe(false);
   });
 
   it("puts breakpoint B on the latest user turn's text part only", () => {
-    const out = assembleRequest(base);
-    const turns = out.filter((m) => m.role !== "system");
-    expect(turns).toEqual([
+    const { messages } = assembleRequest(base);
+    expect(messages).toEqual([
       { role: "user", content: "OPT one" },
       { role: "assistant", content: "answer one" },
       { role: "user", content: [{ type: "text", text: "OPT two", providerOptions: CACHE }] },
@@ -79,11 +87,45 @@ describe("assembleRequest", () => {
   });
 
   it("substitutes the optimized prompt for the latest user turn", () => {
-    const out = assembleRequest({ ...base, optimizedPrompt: "REWRITTEN" });
-    const last = out[out.length - 1];
-    expect(last).toEqual({
+    const { messages } = assembleRequest({ ...base, optimizedPrompt: "REWRITTEN" });
+    expect(messages[messages.length - 1]).toEqual({
       role: "user",
       content: [{ type: "text", text: "REWRITTEN", providerOptions: CACHE }],
+    });
+  });
+
+  // The key-free half of the cache tripwire: the AI SDK must accept the shape
+  // (v7 rejects system entries inside `messages`) and both breakpoints must
+  // still be on the prompt the provider receives.
+  it("is accepted by the AI SDK and both breakpoints reach the model prompt", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: {
+        content: [{ type: "text", text: "OK" }],
+        finishReason: { unified: "stop", raw: "end_turn" },
+        usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+          outputTokens: { total: 1, text: 1, reasoning: 0 },
+        },
+        warnings: [],
+      },
+    });
+    const request = assembleRequest({ ...base, base: "BASE", memory: ["x"] });
+
+    await expect(generateText({ model, ...request })).resolves.toBeDefined();
+
+    const prompt = model.doGenerateCalls[0].prompt;
+    const system = prompt.filter((m) => m.role === "system");
+    expect(system.map((m) => m.content)).toEqual([
+      "BASE",
+      "<memory>\n- x\n</memory>",
+      "Today is 2026-09-18.",
+    ]);
+    expect(system[0].providerOptions).toBeUndefined();
+    expect(system[1].providerOptions).toEqual(CACHE); // breakpoint A survived
+    expect(system[2].providerOptions).toBeUndefined();
+    expect(prompt[prompt.length - 1]).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "OPT two", providerOptions: CACHE }], // breakpoint B
     });
   });
 });

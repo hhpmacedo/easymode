@@ -8,8 +8,12 @@
  *  Anthropic checks earlier block boundaries for hits, so a new B each turn
  *  still matches the previous prefix. Everything before B must be
  *  byte-identical between turns — buildModelMessages guarantees that by
- *  reading optimized prompts from stored metadata, never re-deriving them. */
-import type { ModelMessage } from "ai";
+ *  reading optimized prompts from stored metadata, never re-deriving them.
+ *
+ *  The result is spread straight into streamText: the system layer goes in
+ *  `instructions` (AI SDK v7 rejects system entries inside `messages`) and
+ *  keeps its providerOptions, so breakpoint A reaches the provider. */
+import type { ModelMessage, SystemModelMessage } from "ai";
 import { buildModelMessages } from "./history";
 import type { EasyUIMessage } from "./types";
 
@@ -28,18 +32,25 @@ export interface AssembleInput {
   today: string;
 }
 
+export interface AssembledRequest {
+  /** System layer, in order; breakpoint A on the last stable entry. */
+  instructions: SystemModelMessage[];
+  /** Conversation turns; breakpoint B on the latest user turn's text part. */
+  messages: ModelMessage[];
+}
+
 export function todayISO(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function assembleRequest(input: AssembleInput): ModelMessage[] {
-  const system: ModelMessage[] = [];
+export function assembleRequest(input: AssembleInput): AssembledRequest {
+  const system: SystemModelMessage[] = [];
   if (input.base) system.push({ role: "system", content: input.base });
-  const instructions = input.instructions?.trim();
-  if (instructions) {
+  const userInstructions = input.instructions?.trim();
+  if (userInstructions) {
     system.push({
       role: "system",
-      content: `<user_instructions>\n${instructions}\n</user_instructions>`,
+      content: `<user_instructions>\n${userInstructions}\n</user_instructions>`,
     });
   }
   if (input.memory?.length) {
@@ -69,5 +80,5 @@ export function assembleRequest(input: AssembleInput): ModelMessage[] {
       content: [{ type: "text", text: turns[last].content, providerOptions: CACHE_BREAKPOINT }],
     };
   }
-  return [...system, ...out];
+  return { instructions: system, messages: out };
 }

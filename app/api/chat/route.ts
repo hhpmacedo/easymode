@@ -1,8 +1,15 @@
 import { streamText } from "ai";
 import { classify, applyGuardrail, priorTier } from "@/lib/router";
-import { buildModelMessages, latestUserText } from "@/lib/history";
-import { DEFAULT_FALLBACK_MODEL } from "@/lib/pricing";
-import type { EasyMetadata, EasyUIMessage, RoutingDecision, TokenUsage } from "@/lib/types";
+import { latestUserText } from "@/lib/history";
+import { assembleRequest, todayISO } from "@/lib/context";
+import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
+import type {
+  EasyMetadata,
+  EasyUIMessage,
+  ModelId,
+  RoutingDecision,
+  TokenUsage,
+} from "@/lib/types";
 import { resolveChatAuth } from "@/lib/auth";
 import { providerFor } from "@/lib/provider";
 
@@ -63,11 +70,15 @@ export async function POST(req: Request) {
     };
   }
 
-  // 2. Stream the answer from the chosen model, with optimized-prompt history.
-  const run = (model: string) =>
+  // 2. Stream the answer from the chosen model. assembleRequest owns the
+  //    message order and the prompt-cache breakpoints (spec §3); the output
+  //    cap is a runaway guard, not the cost control.
+  const today = todayISO();
+  const run = (model: ModelId) =>
     streamText({
       model: provider(model),
-      messages: buildModelMessages(messages, routing.optimizedPrompt),
+      ...assembleRequest({ messages, optimizedPrompt: routing.optimizedPrompt, today }),
+      maxOutputTokens: MAX_OUTPUT_TOKENS[model],
     });
 
   let result = run(routing.finalModel);
@@ -106,10 +117,13 @@ export async function POST(req: Request) {
     messageMetadata: ({ part }): EasyMetadata | undefined => {
       if (part.type === "start") return { routing, classifierUsage };
       if (part.type === "finish") {
+        const u = part.totalUsage;
         return {
           usage: {
-            inputTokens: part.totalUsage.inputTokens ?? 0,
-            outputTokens: part.totalUsage.outputTokens ?? 0,
+            inputTokens: u.inputTokens ?? 0,
+            outputTokens: u.outputTokens ?? 0,
+            cacheReadTokens: u.inputTokenDetails.cacheReadTokens ?? 0,
+            cacheWriteTokens: u.inputTokenDetails.cacheWriteTokens ?? 0,
           },
         };
       }
