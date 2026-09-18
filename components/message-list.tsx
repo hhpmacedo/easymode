@@ -7,6 +7,16 @@ import { OptimizationReveal } from "./optimization-reveal";
 import { messageText } from "@/lib/types";
 import type { EasyUIMessage } from "@/lib/types";
 
+// Deliberately lazy, casual prompts that span the routing tiers, so a new user
+// sees the rewrite AND different models: haiku → Haiku, email → Sonnet,
+// debugging → Opus.
+const SUGGESTIONS = [
+  "write a haiku about mondays",
+  "draft a polite email to reschedule a meeting",
+  "explain how HTTPS works to a 10-year-old",
+  "walk me through fixing a deadlock in multithreaded code",
+];
+
 interface Props {
   messages: EasyUIMessage[];
   status: "submitted" | "streaming" | "ready" | "error";
@@ -14,9 +24,18 @@ interface Props {
   onRetry: () => void;
   needsKey?: boolean;
   onConnectKey?: () => void;
+  onSuggestion?: (text: string) => void;
 }
 
-export function MessageList({ messages, status, error, onRetry, needsKey, onConnectKey }: Props) {
+export function MessageList({
+  messages,
+  status,
+  error,
+  onRetry,
+  needsKey,
+  onConnectKey,
+  onSuggestion,
+}: Props) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,6 +75,22 @@ export function MessageList({ messages, status, error, onRetry, needsKey, onConn
                 Connect your Anthropic key to start
               </button>
             )}
+            <div className="mt-10">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.14em] text-muted">
+                Try one to see it in action
+              </p>
+              <div className="mx-auto flex max-w-xl flex-wrap justify-center gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => onSuggestion?.(s)}
+                    className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {messages.map((m, i) =>

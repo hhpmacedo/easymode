@@ -6,3 +6,6 @@ playwright-report/
 *.tsbuildinfo
 .remember/
 .vercel
+
+# Harness-local state (worktrees, session data)
+.claude/
