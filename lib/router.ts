@@ -30,6 +30,16 @@ function hasCode(text: string): boolean {
   return /```|\btraceback\b|\bstack trace\b|\berror:\s/i.test(text);
 }
 
+/** Spec §4.5: short or conversational messages are sent as the user wrote
+ *  them. The classifier is told the same, but this makes it deterministic —
+ *  a rewrite of "thanks, that worked" is never an improvement. */
+export const REWRITE_MIN_WORDS = 15;
+
+export function rewriteGuard(rawText: string, optimizedPrompt: string): string {
+  if (countWords(rawText) < REWRITE_MIN_WORDS) return rawText;
+  return optimizedPrompt.trim() ? optimizedPrompt : rawText;
+}
+
 /** Deterministic post-LLM guardrail. Pure; unit-tested. Only moves the choice
  *  within the pool — never invents a model. `priorModel` is the tier of the
  *  turn this message continues: a follow-up inherits at least that tier
@@ -79,7 +89,7 @@ export type ClassifierOutput = z.infer<typeof classifierSchema>;
 const CLASSIFIER_SYSTEM = `You are the routing brain of EasyMode, a chat app that maximizes quality/price.
 For each new user message you do two jobs:
 
-1. REWRITE the message into an excellent prompt (optimizedPrompt): preserve the user's intent and language exactly; add structure, clarify implicit requirements, specify desired format/length when obvious. Never invent requirements the user didn't imply. For trivial messages (greetings, one-liners) minimal or no rewriting is correct.
+1. REWRITE the message into an excellent prompt (optimizedPrompt): keep the user's wording, intent and language; only add what they clearly implied (for example a format they obviously want). Never invent requirements, never change the ask, never expand a short message. If the message is conversational or under about 15 words, return it unchanged.
 
 2. ROUTE to the cheapest Anthropic model that will do the job well (chosenModel):
 - trivial → claude-haiku-4-5: greetings, format tweaks, short rewrites, simple facts
