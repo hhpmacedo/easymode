@@ -43,10 +43,29 @@ describe("normalizeMemoryText", () => {
 });
 
 describe("isNearDuplicate", () => {
-  it("matches the same fact in different words, not different facts", () => {
+  it("matches the same fact in different words or with more detail", () => {
     expect(isNearDuplicate("Prefers pnpm over npm", "prefers pnpm rather than npm")).toBe(true);
     expect(isNearDuplicate("Works in TypeScript", "Works in TypeScript and Next.js")).toBe(true);
+    expect(isNearDuplicate("Lives in Lisbon", "Lives in Lisbon, Portugal")).toBe(true);
+    expect(isNearDuplicate("Uses React", "uses  REACT")).toBe(true);
+  });
+  it("does not match different facts that share words", () => {
     expect(isNearDuplicate("Prefers pnpm", "Lives in Lisbon")).toBe(false);
+    expect(isNearDuplicate("Lives in Lisbon", "Lives in London")).toBe(false);
+    expect(isNearDuplicate("Wants concise answers", "Wants detailed answers")).toBe(false);
+    expect(isNearDuplicate("Uses Python 3", "Uses Python 2")).toBe(false);
+    expect(isNearDuplicate("Team of 4", "Team of 40")).toBe(false);
+  });
+  it("compares whole words, so a prefix or a short token is not a match", () => {
+    expect(isNearDuplicate("Uses R", "Uses React")).toBe(false);
+    expect(isNearDuplicate("Has a cat", "Has a category system for notes")).toBe(false);
+    expect(isNearDuplicate("Likes Go", "Likes Google Docs")).toBe(false);
+    expect(isNearDuplicate("Uses Go", "Uses C")).toBe(false);
+  });
+  it("treats negation as content", () => {
+    expect(isNearDuplicate("Not a morning person", "Morning person")).toBe(false);
+    expect(isNearDuplicate("Not interested in Rust", "Interested in Rust")).toBe(false);
+    expect(isNearDuplicate("Doesn't like Rust", "Likes Rust")).toBe(false);
   });
 });
 
@@ -101,6 +120,53 @@ describe("mergeMemories", () => {
     expect(out[0].status).toBe("archived");
     expect(out[0].text).toBe("gone");
   });
+  it("never mutates its input", () => {
+    const before = structuredClone(existing);
+    mergeMemories(
+      existing,
+      {
+        add: [{ text: "Uses Next.js 16 at work", kind: "project" }],
+        update: [{ id: "2", text: "Lives in Lisbon, Portugal" }],
+        archive: ["3"],
+      },
+      ctx,
+    );
+    expect(existing).toEqual(before);
+  });
+  it("dedupes adds against memories added earlier in the same batch", () => {
+    const out = mergeMemories(
+      [],
+      {
+        add: [
+          { text: "Prefers pnpm over npm", kind: "preference" },
+          { text: "prefers pnpm rather than npm", kind: "preference" },
+        ],
+        update: [],
+        archive: [],
+      },
+      ctx,
+    );
+    expect(out.map((m) => m.text)).toEqual(["Prefers pnpm over npm"]);
+  });
+  it("ignores an update whose text normalizes to empty", () => {
+    const out = mergeMemories(
+      existing,
+      { add: [], update: [{ id: "1", text: "  \n " }], archive: [] },
+      ctx,
+    );
+    expect(out.find((m) => m.id === "1")).toEqual(existing[0]);
+  });
+  it("archives an id that appears in both update and archive", () => {
+    const out = mergeMemories(
+      existing,
+      { add: [], update: [{ id: "3", text: "New job at Acme" }], archive: ["3"] },
+      ctx,
+    );
+    expect(out.find((m) => m.id === "3")).toMatchObject({
+      status: "archived",
+      text: "Old job at Acme",
+    });
+  });
 });
 
 describe("memoryLines", () => {
@@ -141,6 +207,16 @@ describe("parseRememberCommand", () => {
     });
     expect(parseRememberCommand("do you remember: the plan?")).toBeNull();
     expect(parseRememberCommand("remember:")).toBeNull();
+  });
+  it("takes the first line after the prefix, even across a newline or CRLF", () => {
+    expect(parseRememberCommand("remember:\nI prefer pnpm\nplan sprint")).toEqual({
+      memory: "I prefer pnpm",
+      rest: "I prefer pnpm\nplan sprint",
+    });
+    expect(parseRememberCommand("remember: I prefer pnpm\r\nplan sprint")).toEqual({
+      memory: "I prefer pnpm",
+      rest: "I prefer pnpm\r\nplan sprint",
+    });
   });
 });
 

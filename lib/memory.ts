@@ -33,8 +33,11 @@ export function normalizeMemoryText(text: string): string {
 }
 
 /** Function words that carry no fact; ignored when comparing memories so the
- *  same fact phrased differently ("over" vs "rather than") still overlaps. */
+ *  same fact phrased differently ("over" vs "rather than") still overlaps.
+ *  Negation is content, not filler, so `not` and friends are never here. */
 const STOP_WORDS = new Set([
+  "a",
+  "an",
   "and",
   "but",
   "the",
@@ -47,7 +50,6 @@ const STOP_WORDS = new Set([
   "rather",
   "that",
   "this",
-  "not",
   "are",
   "was",
   "has",
@@ -57,26 +59,34 @@ const STOP_WORDS = new Set([
   "about",
 ]);
 
+/** Every token counts, however short: "R", "Go", "C" and version numbers are
+ *  the whole difference between distinct facts. */
 function words(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length >= 3 && !STOP_WORDS.has(w)),
+      .filter((w) => w.length > 0 && !STOP_WORDS.has(w)),
   );
 }
 
-/** Same fact in different words: high word overlap, or one contains the other. */
+const NEGATION = /\b(?:not|no|never)\b|n't\b/;
+
+/** Same fact in different words: high word overlap, or one's words contain the
+ *  other's (same fact, more detail). Word-set, not substring, so "Uses R" is
+ *  not inside "Uses React". A negated and a non-negated sentence are never the
+ *  same fact. */
 export function isNearDuplicate(a: string, b: string): boolean {
   const na = normalizeMemoryText(a).toLowerCase();
   const nb = normalizeMemoryText(b).toLowerCase();
   if (!na || !nb) return false;
-  if (na.includes(nb) || nb.includes(na)) return true;
+  if (NEGATION.test(na) !== NEGATION.test(nb)) return false;
   const wa = words(na);
   const wb = words(nb);
   if (!wa.size || !wb.size) return false;
   let shared = 0;
   for (const w of wa) if (wb.has(w)) shared++;
+  if (shared === wa.size || shared === wb.size) return true;
   return shared / (wa.size + wb.size - shared) >= 0.6;
 }
 
