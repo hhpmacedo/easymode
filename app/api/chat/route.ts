@@ -18,10 +18,14 @@ import { providerFor } from "@/lib/provider";
 
 export const maxDuration = 120;
 
-// Caps on what one request may push through the paid API (a 200 KB body is
-// far past any real conversation this UI produces).
-const MAX_BODY_BYTES = 200_000;
-const MAX_MESSAGES = 200;
+// Caps on what one request may push through the paid API. The client sends
+// the whole thread (assembleRequest drops pre-boundary turns server-side), so
+// these must clear the 150K-token compaction ceiling: a measured 150K-token
+// thread serialises to ~900K chars over ~650 messages once assistant metadata
+// (routing reasoning, prompt copy) and JSON framing are included. Roughly
+// twice that keeps compaction reachable at every threshold setting.
+const MAX_BODY_BYTES = 2_000_000;
+const MAX_MESSAGES = 1_000;
 
 export async function POST(req: Request) {
   // Decide who pays (the caller's key or the server's) and whether they may
@@ -44,7 +48,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Malformed JSON body." }, { status: 400 });
   }
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
-    return Response.json({ error: "Expected 1–200 messages." }, { status: 400 });
+    return Response.json({ error: `Expected 1–${MAX_MESSAGES} messages.` }, { status: 400 });
   }
   // The client owns instructions (spec §7.4); the server only bounds them.
   const instructions = typeof context.instructions === "string" ? context.instructions : "";

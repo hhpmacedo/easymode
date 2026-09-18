@@ -7,10 +7,15 @@ import type { EasyUIMessage } from "@/lib/types";
 
 export const maxDuration = 60;
 
-// The client sends only the turns to compact: at most ~150K tokens of text
-// (the threshold ceiling), which at chars/4 is ~600 KB plus JSON overhead.
-const MAX_BODY_BYTES = 800_000;
-const MAX_MESSAGES = 400;
+// The client sends only the turns to compact, as full UI messages. At the
+// 150K-token threshold ceiling that is ~600K chars of text, but every
+// assistant message also carries metadata (routing reasoning plus a second
+// copy of the user's prompt) and JSON framing, so a measured 150K-token
+// thread serialises to ~900K chars over ~650 messages. Cap at roughly twice
+// that so the ceiling is always reachable; the compaction limiter (10 per
+// 15 min) and Haiku's 200K window bound spend, not these caps.
+const MAX_BODY_BYTES = 2_000_000;
+const MAX_MESSAGES = 1_000;
 
 /** Summarize older turns into a CompactionSummary (spec §6.2). One Haiku call
  *  on the caller's key (or the server's, behind the token gate). The client
