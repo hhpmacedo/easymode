@@ -12,21 +12,32 @@ interface Props {
 
 export function Sidebar({ conversations, activeId, onNew, onSelect, onRename, onDelete }: Props) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/40">
-      <div className="p-3">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-paper">
+      <div className="px-4 pt-5 pb-3">
+        <p className="font-serif text-xl italic tracking-tight text-ink">EasyMode</p>
+        <p className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-muted">
+          quality / price, maximized
+        </p>
+      </div>
+      <div className="px-3 pb-2">
         <button
           onClick={onNew}
-          className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium hover:bg-blue-500"
+          className="w-full rounded-xl bg-ink py-2.5 text-sm font-medium text-paper transition-colors hover:bg-ink-soft"
         >
-          + New chat
+          New chat
         </button>
       </div>
+      <p className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-[0.14em] text-muted">
+        Conversations
+      </p>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
         {conversations.map((c) => (
           <div
             key={c.id}
-            className={`group flex items-center rounded-lg px-2 py-1.5 text-sm ${
-              c.id === activeId ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50"
+            className={`group flex items-center rounded-lg border px-2.5 py-2 text-sm transition-colors ${
+              c.id === activeId
+                ? "border-line bg-surface text-ink shadow-[0_1px_2px_rgba(29,26,21,0.04)]"
+                : "border-transparent text-ink-soft hover:bg-surface/70"
             }`}
           >
             <button
@@ -41,14 +52,14 @@ export function Sidebar({ conversations, activeId, onNew, onSelect, onRename, on
                 const t = prompt("Rename conversation", c.title);
                 if (t) onRename(c.id, t);
               }}
-              className="hidden px-1 text-xs text-zinc-500 hover:text-zinc-200 group-hover:block"
+              className="hidden px-1 text-xs text-muted hover:text-ink group-hover:block"
               aria-label="Rename"
             >
               ✎
             </button>
             <button
               onClick={() => confirm("Delete this conversation?") && onDelete(c.id)}
-              className="hidden px-1 text-xs text-zinc-500 hover:text-red-400 group-hover:block"
+              className="hidden px-1 text-xs text-muted hover:text-rust group-hover:block"
               aria-label="Delete"
             >
               ×

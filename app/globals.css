@@ -1,9 +1,126 @@
 @import "tailwindcss";
-@import "highlight.js/styles/github-dark.css";
+@plugin "@tailwindcss/typography";
+@import "highlight.js/styles/github.css";
+
+@theme inline {
+  /* Warm paper + warm ink. One accent (pine, for savings), amber for premium. */
+  --color-paper: #f6f4ee;
+  --color-surface: #fffefb;
+  --color-line: #e6e1d5;
+  --color-line-strong: #d5cfc0;
+  --color-ink: #1d1a15;
+  --color-ink-soft: #524c40;
+  --color-muted: #8b8374;
+  --color-pine: #1e6b4a;
+  --color-pine-deep: #17543a;
+  --color-pine-soft: #e6efe7;
+  --color-amber: #8f5c12;
+  --color-amber-soft: #f5ead4;
+  --color-rust: #9c3b25;
+  --color-rust-soft: #f7e7e1;
+
+  --font-sans: var(--font-instrument), "Helvetica Neue", ui-sans-serif, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+  --font-mono: var(--font-splinemono), ui-monospace, monospace;
+}
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
+
 body {
-  @apply bg-zinc-950 text-zinc-100 antialiased;
+  @apply bg-paper text-ink font-sans antialiased;
+  /* Faint atmospheric wash — paper isn't flat. */
+  background-image: radial-gradient(1200px 500px at 70% -10%, #fffdf6 0%, transparent 60%);
+  font-feature-settings: "ss01";
+}
+
+/* Numbers everywhere line up: costs, savings, usage. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Quiet scrollbars that match the paper. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* Messages settle onto the page. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The "thinking" shimmer while the router works. */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted) 40%,
+    var(--color-ink) 50%,
+    var(--color-muted) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Markdown answers: typographic, warm, restrained. */
+.answer-prose {
+  @apply prose prose-stone max-w-none;
+}
+.answer-prose :is(h1, h2, h3, h4) {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+.answer-prose :is(p, li) {
+  color: var(--color-ink-soft);
+}
+.answer-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
+}
+.answer-prose code::before,
+.answer-prose code::after {
+  content: none;
+}
+.answer-prose pre {
+  background: #fbf9f4;
+  border: 1px solid var(--color-line);
+  border-radius: 0.6rem;
+}
+.answer-prose pre code {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.answer-prose a {
+  color: var(--color-pine);
 }

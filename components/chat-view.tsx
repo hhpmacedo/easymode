@@ -42,21 +42,30 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         baseline += t.baselineCost;
       }
     }
-    return { savings, pct: baseline > 0 ? (savings / baseline) * 100 : 0 };
+    return { savings, baseline, pct: baseline > 0 ? (savings / baseline) * 100 : 0 };
   }, [messages]);
 
   const busy = status === "submitted" || status === "streaming";
 
   return (
-    <div className="flex h-full flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
-        <h1 className="text-sm font-semibold text-zinc-300">EasyMode</h1>
-        {messages.some((m) => m.role === "assistant") && (
-          <span className="text-xs text-zinc-400">
-            This conversation:{" "}
-            <strong className={total.savings >= 0 ? "text-emerald-400" : "text-amber-400"}>
-              {total.savings >= 0 ? "saved" : "premium"} {formatUSD(Math.abs(total.savings))} (~
-              {Math.abs(total.pct).toFixed(0)}%)
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      <header className="flex h-14 items-center justify-between border-b border-line bg-paper/80 px-6 backdrop-blur">
+        <h1 className="text-[13px] font-medium uppercase tracking-[0.14em] text-muted">
+          Conversation
+        </h1>
+        {total.baseline > 0 && (
+          <span className="flex items-center gap-2 text-xs text-muted">
+            <strong
+              className={`rounded-full border px-2.5 py-1 font-medium ${
+                total.savings >= 0
+                  ? "border-pine/20 bg-pine-soft text-pine-deep"
+                  : "border-amber/20 bg-amber-soft text-amber"
+              }`}
+            >
+              {total.savings >= 0 ? "saved" : "premium"}{" "}
+              <span className="tabular">
+                {formatUSD(Math.abs(total.savings))} (~{Math.abs(total.pct).toFixed(0)}%)
+              </span>
             </strong>{" "}
             vs always-Opus · est.
           </span>
