@@ -1,0 +1,53 @@
+[
+  {
+    "name": "api migration",
+    "turns": [
+      [
+        "user",
+        "We're migrating our billing service from Stripe's v2 API to v3 by October 15. The service is in services/billing/, TypeScript, and we must keep the webhook signature check exactly as is."
+      ],
+      [
+        "assistant",
+        "Understood. Key constraints: deadline October 15, code in services/billing/, TypeScript, webhook signature verification unchanged. Do you want a phased cutover or a big-bang switch?"
+      ],
+      [
+        "user",
+        "Phased. Start with the customer endpoints, then invoices. Also: our idempotency keys are 'bill-' followed by the order id, don't change that format."
+      ],
+      [
+        "assistant",
+        "Phased it is: customers first, then invoices. Idempotency keys stay 'bill-<orderId>'. First step: add a v3 client under services/billing/v3/ behind a feature flag."
+      ]
+    ],
+    "expect": [
+      "October 15",
+      "services/billing",
+      "webhook signature",
+      "customer",
+      "invoice",
+      "bill-"
+    ]
+  },
+  {
+    "name": "trip planning",
+    "turns": [
+      [
+        "user",
+        "Planning 5 days in Lisbon in March with my mother, who uses a cane, so no long uphill walks. Budget is about 1500 euros total excluding flights."
+      ],
+      [
+        "assistant",
+        "Got it: 5 days, Lisbon, March, travelling with your mother who uses a cane — flat routes and taxis/trams over hills — and a 1,500 EUR budget excluding flights. Shall I plan day by day?"
+      ],
+      [
+        "user",
+        "Yes. We definitely want one day in Sintra, and she wants to see the Jerónimos monastery. Skip nightlife entirely."
+      ],
+      [
+        "assistant",
+        "Plan outline: Day 1 Belém incl. Jerónimos (flat), Day 2 Baixa/Alfama by tram 28 and taxi, Day 3 Sintra by train with a tuk-tuk between sights, Day 4 Parque das Nações (flat), Day 5 Cascais. No nightlife."
+      ]
+    ],
+    "expect": ["5 days", "Lisbon", "cane", "1500", "Sintra", "Jerónimos", "nightlife"]
+  }
+]

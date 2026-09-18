@@ -44,6 +44,10 @@ jobs:
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::No ANTHROPIC_API_KEY secret - skipping cache check"; exit 0; fi
           npm run eval:cache
+      - name: Compaction faithfulness (2 fixture threads)
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::No ANTHROPIC_API_KEY secret - skipping compaction check"; exit 0; fi
+          npm run eval:compact
       - name: E2E smoke
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::No ANTHROPIC_API_KEY secret - skipping e2e"; exit 0; fi
