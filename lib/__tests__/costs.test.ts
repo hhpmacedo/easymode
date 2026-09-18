@@ -35,7 +35,7 @@ describe("turnCosts", () => {
     expect(t.pct).toBe(0);
   });
   it("a pricier-than-ceiling model (Fable) is a real 'premium'", () => {
-    const t = turnCosts("claude-fable-5", usage, clsUsage);
+    const t = turnCosts("claude-fable-5-1", usage, clsUsage);
     expect(t.tier).toBe("premium");
     expect(t.amount).toBeCloseTo(t.totalCost - t.baselineCost, 10);
     expect(t.amount).toBeGreaterThan(0);
@@ -53,7 +53,7 @@ describe("turnCosts", () => {
 describe("conversationSavings", () => {
   it("nets saved turns against premium turns", () => {
     const saved = turnCosts("claude-haiku-4-5", usage, clsUsage);
-    const premium = turnCosts("claude-fable-5", usage, clsUsage);
+    const premium = turnCosts("claude-fable-5-1", usage, clsUsage);
     const c = conversationSavings([saved, premium]);
     expect(c.tier).toBe(saved.amount > premium.amount ? "saved" : "premium");
   });

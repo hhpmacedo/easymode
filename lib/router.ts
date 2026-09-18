@@ -11,7 +11,8 @@ const RANK: Record<ModelId, number> = {
   "claude-sonnet-5": 1,
   "claude-opus-5": 2,
   "claude-opus-4-8": 2, // legacy, same tier as Opus 5
-  "claude-fable-5": 3,
+  "claude-fable-5-1": 3,
+  "claude-fable-5": 3, // legacy, same tier as Fable 5.1
 };
 
 function countWords(text: string): number {
@@ -47,8 +48,8 @@ export function applyGuardrail(
   if ((code || words > 300) && RANK[model] < RANK["claude-sonnet-5"]) {
     model = "claude-sonnet-5";
   }
-  // Fable gate: only exceptional + substantial.
-  if (model === "claude-fable-5" && !(complexity === "exceptional" && words > 50)) {
+  // Fable gate: the top tier is only for exceptional + substantial prompts.
+  if (RANK[model] === 3 && !(complexity === "exceptional" && words > 50)) {
     model = "claude-opus-5";
   }
   return { model, applied: model !== chosen };
@@ -74,7 +75,7 @@ For each new user message you do two jobs:
 - trivial → claude-haiku-4-5: greetings, format tweaks, short rewrites, simple facts
 - everyday → claude-sonnet-5: general Q&A, summaries, standard code, explanations
 - hard → claude-opus-5: multi-step reasoning, nuanced analysis, tricky debugging, long/complex code
-- exceptional → claude-fable-5: RARE. Only genuinely demanding long-horizon reasoning.
+- exceptional → claude-fable-5-1: RARE. Only genuinely demanding long-horizon reasoning.
 
 Follow-up rule: a follow-up message ("yes do that", "now make it faster") inherits AT LEAST the tier of the task it continues, unless it is a clear topic switch. Use the conversation context provided.`;
 

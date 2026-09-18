@@ -13,7 +13,7 @@ describe("applyGuardrail", () => {
       model: "claude-sonnet-5",
       applied: true,
     });
-    expect(applyGuardrail("claude-fable-5", "exceptional", SHORT).model).toBe("claude-sonnet-5");
+    expect(applyGuardrail("claude-fable-5-1", "exceptional", SHORT).model).toBe("claude-sonnet-5");
   });
   it("does not cap short messages with multiple questions", () => {
     const multi = "why? how? really?";
@@ -29,10 +29,12 @@ describe("applyGuardrail", () => {
     expect(applyGuardrail("claude-haiku-4-5", "trivial", LONG).model).toBe("claude-sonnet-5");
   });
   it("demotes Fable to Opus unless complexity is exceptional AND >50 words", () => {
-    expect(applyGuardrail("claude-fable-5", "hard", HARD60).model).toBe("claude-opus-5");
+    expect(applyGuardrail("claude-fable-5-1", "hard", HARD60).model).toBe("claude-opus-5");
     // 15–50 words: escapes the short-message cap, but still not substantial enough for Fable.
-    expect(applyGuardrail("claude-fable-5", "exceptional", MID20).model).toBe("claude-opus-5");
-    expect(applyGuardrail("claude-fable-5", "exceptional", HARD60).model).toBe("claude-fable-5");
+    expect(applyGuardrail("claude-fable-5-1", "exceptional", MID20).model).toBe("claude-opus-5");
+    expect(applyGuardrail("claude-fable-5-1", "exceptional", HARD60).model).toBe(
+      "claude-fable-5-1",
+    );
   });
   it("does not drop a short follow-up below the prior tier (criterion 3)", () => {
     // "now make it faster" after a hard/Opus task: cap must not undercut Opus.

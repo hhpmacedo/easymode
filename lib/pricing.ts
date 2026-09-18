@@ -11,8 +11,9 @@ export const PRICING: Record<
   "claude-haiku-4-5": { inputPerMTok: 1.0, outputPerMTok: 5.0, label: "Haiku 4.5" },
   "claude-sonnet-5": { inputPerMTok: 3.0, outputPerMTok: 15.0, label: "Sonnet 5" },
   "claude-opus-5": { inputPerMTok: 5.0, outputPerMTok: 25.0, label: "Opus 5" },
-  // Legacy — superseded by Opus 5 at the same price. Kept so older stored
-  // conversations still resolve a label/price.
+  "claude-fable-5-1": { inputPerMTok: 10.0, outputPerMTok: 50.0, label: "Fable 5.1" },
+  // Legacy — superseded at the same price. Kept so older stored conversations
+  // still resolve a label/price.
   "claude-opus-4-8": { inputPerMTok: 5.0, outputPerMTok: 25.0, label: "Opus 4.8" },
   "claude-fable-5": { inputPerMTok: 10.0, outputPerMTok: 50.0, label: "Fable 5" },
 };
