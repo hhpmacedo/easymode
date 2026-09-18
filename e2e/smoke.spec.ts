@@ -1,7 +1,25 @@
 import { test, expect } from "@playwright/test";
 
+const TOKEN = process.env.EASYMODE_ACCESS_TOKEN!;
+
+test("API refuses chat without the access token", async ({ request }) => {
+  const body = { messages: [{ id: "1", role: "user", parts: [{ type: "text", text: "hi" }] }] };
+  const anon = await request.post("/api/chat", { data: body });
+  expect(anon.status()).toBe(401);
+  const wrong = await request.post("/api/chat", {
+    data: body,
+    headers: { authorization: "Bearer not-the-token" },
+  });
+  expect(wrong.status()).toBe(401);
+  const login = await request.post("/api/auth", { data: { token: "not-the-token" } });
+  expect(login.status()).toBe(401);
+});
+
 test("trivial message routes cheap, reveal opens, savings accumulate", async ({ page }) => {
   await page.goto("/");
+  // Unlock with the access token; the session cookie survives the reload below.
+  await page.getByLabel("Access token").fill(TOKEN);
+  await page.getByRole("button", { name: "Unlock" }).click();
   const box = page.getByPlaceholder(/ask anything/i);
 
   // 1. Trivial message → cheap model chip.

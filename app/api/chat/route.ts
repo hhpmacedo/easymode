@@ -4,11 +4,33 @@ import { classify, applyGuardrail, priorTier } from "@/lib/router";
 import { buildModelMessages, latestUserText } from "@/lib/history";
 import { DEFAULT_FALLBACK_MODEL } from "@/lib/pricing";
 import type { EasyMetadata, EasyUIMessage, RoutingDecision, TokenUsage } from "@/lib/types";
+import { guardChat } from "@/lib/auth";
 
 export const maxDuration = 120;
 
+// Caps on what one request may push through the paid API (a 200 KB body is
+// far past any real conversation this UI produces).
+const MAX_BODY_BYTES = 200_000;
+const MAX_MESSAGES = 200;
+
 export async function POST(req: Request) {
-  const { messages }: { messages: EasyUIMessage[] } = await req.json();
+  // This route spends ANTHROPIC_API_KEY credit: token gate + rate limit first.
+  const denied = guardChat(req);
+  if (denied) return denied;
+
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return Response.json({ error: "Request body too large." }, { status: 413 });
+  }
+  let messages: EasyUIMessage[];
+  try {
+    ({ messages } = JSON.parse(raw));
+  } catch {
+    return Response.json({ error: "Malformed JSON body." }, { status: 400 });
+  }
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
+    return Response.json({ error: "Expected 1–200 messages." }, { status: 400 });
+  }
   const rawText = latestUserText(messages);
   const history = messages.slice(0, -1); // context for the classifier
 
