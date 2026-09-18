@@ -5,20 +5,29 @@ import { z } from "zod";
 import { messageText } from "./types";
 import type { CompactionSummary, EasyUIMessage } from "./types";
 
+// Per-field caps (spec §7.1): the summary sits inside every request's cached
+// prefix, so a runaway or hostile one must stay bounded.
+const ITEM_MAX = 4_000;
+const ITEMS_MAX = 60;
+const item = z.string().max(ITEM_MAX);
+
 export const compactionSummarySchema = z.object({
   goal: z
     .string()
+    .max(2_000)
     .describe("One or two sentences: what the conversation is about and what the user wants"),
-  decisions: z.array(z.string()).describe("Things that were settled, one per item"),
+  decisions: z.array(item).max(ITEMS_MAX).describe("Things that were settled, one per item"),
   facts: z
-    .array(z.string())
+    .array(item)
+    .max(ITEMS_MAX)
     .describe("Constraints, data, names, numbers the user stated, one per item"),
   artifacts: z
-    .array(z.string())
+    .array(item)
+    .max(ITEMS_MAX)
     .describe(
       "Code or text the user may refer back to: verbatim when 40 lines or fewer, else a precise description",
     ),
-  open: z.array(z.string()).describe("Unresolved threads and pending questions"),
+  open: z.array(item).max(ITEMS_MAX).describe("Unresolved threads and pending questions"),
 });
 
 const compactionContextSchema = z.object({
@@ -105,4 +114,24 @@ export function lastInputTokens(messages: EasyUIMessage[]): number {
     if (m.role === "assistant" && m.metadata?.usage) return m.metadata.usage.inputTokens;
   }
   return 0;
+}
+
+/** What the NEXT message will carry (spec §6.1 header meter). Until an answer
+ *  arrives after a compaction, `lastInputTokens` still reports the
+ *  pre-compaction size, so estimate instead: the rendered summary plus the
+ *  verbatim tail. Once a turn has been answered on the compacted thread the
+ *  measured number is better, and we return that. */
+export function nextContextTokens(
+  messages: EasyUIMessage[],
+  compaction?: { throughMessageId: string; summary: CompactionSummary },
+): number {
+  if (!compaction) return lastInputTokens(messages);
+  const idx = messages.findIndex((m) => m.id === compaction.throughMessageId);
+  if (idx < 0) return lastInputTokens(messages);
+  const answeredSince = messages.some(
+    (m, i) => i > idx && m.role === "assistant" && m.metadata?.usage,
+  );
+  if (answeredSince) return lastInputTokens(messages);
+  const tail = messages.slice(idx + 1).reduce((n, m) => n + estimateTokens(messageText(m)), 0);
+  return estimateTokens(renderCompaction(compaction.summary)) + tail;
 }

@@ -75,7 +75,11 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
     setMetaVersion((v) => v + 1);
     onMessagesChanged();
   }, [onMessagesChanged]);
-  const { compactNow, contextTokens } = useCompaction({
+  const {
+    compactNow,
+    contextTokens,
+    state: compactState,
+  } = useCompaction({
     conversationId,
     messages,
     status,
@@ -159,10 +163,20 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           {contextTokens > 0 && (
             <button
               onClick={() => void compactNow()}
-              className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
-              title="Context the model sees on the next message. Click to summarize older turns now."
+              disabled={busy || compactState === "running"}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface disabled:opacity-50"
+              title="Estimated context your next message will carry. Click to summarize older turns now."
             >
-              Context <span className="tabular">{formatTokens(contextTokens)}</span> · compact
+              Context <span className="tabular">{formatTokens(contextTokens)}</span> ·{" "}
+              {compactState === "running"
+                ? "compacting…"
+                : compactState === "failed"
+                  ? "compaction failed — retry"
+                  : compactState === "nothing"
+                    ? "nothing to compact"
+                    : compactState === "done"
+                      ? "compacted"
+                      : "compact"}
             </button>
           )}
         </div>

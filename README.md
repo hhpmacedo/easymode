@@ -39,7 +39,7 @@ Long conversations are compacted: when the context passes the threshold in
 the background into a structured note — goal, decisions, facts, artifacts, open
 threads — that the model reads instead of those turns. The note appears in the
 thread where the cut was made; open it to read or edit it. The header shows the
-context size the next message will carry.
+estimated context size your next message will carry, and lets you compact now.
 
 ## Scripts
 

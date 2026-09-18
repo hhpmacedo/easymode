@@ -40,6 +40,21 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // Shape check up front: a malformed turn must be a 400 the client stops
+  // retrying, not a 502 it retries every turn.
+  const wellFormed = messages.every(
+    (m) =>
+      m &&
+      (m.role === "user" || m.role === "assistant") &&
+      Array.isArray(m.parts) &&
+      m.parts.every((p) => typeof p === "object" && p !== null && typeof p.type === "string"),
+  );
+  if (!wellFormed) {
+    return Response.json(
+      { error: "Messages must be user/assistant turns with parts." },
+      { status: 400 },
+    );
+  }
   const prior = compactionSummarySchema.safeParse(body.prior);
 
   try {

@@ -5,6 +5,7 @@ import {
   COMPACTION_ACK,
   estimateTokens,
   lastInputTokens,
+  nextContextTokens,
   parseCompactionContext,
   renderCompaction,
   transcriptText,
@@ -124,5 +125,48 @@ describe("schemas", () => {
     expect(
       parseCompactionContext({ throughMessageId: "a2", summary: { goal: "x" } }),
     ).toBeUndefined();
+  });
+});
+
+describe("nextContextTokens", () => {
+  it("reports the measured size when there is no compaction", () => {
+    expect(nextContextTokens([user("1", "a"), assistant("2", "b", 41_000)])).toBe(41_000);
+  });
+  it("estimates summary + tail right after a compaction, before any new answer", () => {
+    const msgs = [
+      user("1", "a"),
+      assistant("2", "x".repeat(4000), 41_000),
+      user("3", "y".repeat(400)),
+    ];
+    const n = nextContextTokens(msgs, { throughMessageId: "2", summary });
+    expect(n).toBe(estimateTokens(renderCompaction(summary)) + 100);
+  });
+  it("returns to the measured size once a turn has been answered on the compacted thread", () => {
+    const msgs = [
+      user("1", "a"),
+      assistant("2", "b", 41_000),
+      user("3", "c"),
+      assistant("4", "d", 3_500),
+    ];
+    expect(nextContextTokens(msgs, { throughMessageId: "2", summary })).toBe(3_500);
+  });
+  it("falls back to the measured size when the boundary id is gone", () => {
+    expect(
+      nextContextTokens([user("1", "a"), assistant("2", "b", 41_000)], {
+        throughMessageId: "zz",
+        summary,
+      }),
+    ).toBe(41_000);
+  });
+});
+
+describe("summary caps", () => {
+  it("rejects oversized fields so the cached prefix stays bounded", () => {
+    expect(compactionSummarySchema.safeParse({ ...summary, goal: "g".repeat(2_001) }).success).toBe(
+      false,
+    );
+    expect(
+      compactionSummarySchema.safeParse({ ...summary, facts: Array(61).fill("f") }).success,
+    ).toBe(false);
   });
 });

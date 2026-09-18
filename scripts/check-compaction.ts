@@ -28,8 +28,11 @@ async function main() {
       COMPACTION_SYSTEM,
       buildCompactionPrompt(messages),
     );
-    const rendered = renderCompaction(result).toLowerCase();
-    const missing = c.expect.filter((e) => !rendered.includes(e.toLowerCase()));
+    // Numbers may come back as "1,500" or "1 500" for "1500": compare with
+    // thousands separators stripped on both sides.
+    const norm = (s: string) => s.toLowerCase().replace(/(\d)[,\s](?=\d{3}\b)/g, "$1");
+    const rendered = norm(renderCompaction(result));
+    const missing = c.expect.filter((e) => !rendered.includes(norm(e)));
     const ok = missing.length === 0;
     if (!ok) failed = true;
     console.log(`${ok ? "✅" : "❌"} ${c.name}${ok ? "" : ` — missing: ${missing.join(", ")}`}`);
