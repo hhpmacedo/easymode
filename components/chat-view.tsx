@@ -5,7 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { MessageList } from "./message-list";
 import { Composer } from "./composer";
 import { KeySettings } from "./key-settings";
-import { turnCosts, formatUSD } from "@/lib/costs";
+import { turnCosts, conversationSavings, formatUSD } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { getUserKey, KEY_CHANGE_EVENT } from "@/lib/client-key";
 import type { ConversationStore } from "@/lib/storage";
@@ -50,19 +50,16 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
     }
   }, [messages, conversationId, store, onMessagesChanged]);
 
-  // Conversation-level savings total (spec §5).
+  // Conversation-level savings verdict (spec §5).
   const total = useMemo(() => {
-    let savings = 0;
-    let baseline = 0;
+    const turns = [];
     for (const m of messages) {
       const meta = m.metadata;
       if (m.role === "assistant" && meta?.routing && meta.usage && meta.classifierUsage) {
-        const t = turnCosts(meta.routing.finalModel, meta.usage, meta.classifierUsage);
-        savings += t.savings;
-        baseline += t.baselineCost;
+        turns.push(turnCosts(meta.routing.finalModel, meta.usage, meta.classifierUsage));
       }
     }
-    return { savings, baseline, pct: baseline > 0 ? (savings / baseline) * 100 : 0 };
+    return { hasTurns: turns.length > 0, ...conversationSavings(turns) };
   }, [messages]);
 
   const busy = status === "submitted" || status === "streaming";
@@ -82,19 +79,27 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
             API key
           </button>
         </div>
-        {total.baseline > 0 && (
+        {total.hasTurns && (
           <span className="flex items-center gap-2 text-xs text-muted">
             <strong
               className={`rounded-full border px-2.5 py-1 font-medium ${
-                total.savings >= 0
+                total.tier === "saved"
                   ? "border-pine/20 bg-pine-soft text-pine-deep"
-                  : "border-amber/20 bg-amber-soft text-amber"
+                  : total.tier === "premium"
+                    ? "border-amber/20 bg-amber-soft text-amber"
+                    : "border-line bg-paper text-muted"
               }`}
             >
-              {total.savings >= 0 ? "saved" : "premium"}{" "}
-              <span className="tabular">
-                {formatUSD(Math.abs(total.savings))} (~{Math.abs(total.pct).toFixed(0)}%)
-              </span>
+              {total.tier === "matched" ? (
+                "on the best models"
+              ) : (
+                <>
+                  {total.tier === "saved" ? "saved" : "premium"}{" "}
+                  <span className="tabular">
+                    {formatUSD(total.amount)} (~{total.pct.toFixed(0)}%)
+                  </span>
+                </>
+              )}
             </strong>{" "}
             vs always-{PRICING[BASELINE_MODEL].label} · est.
           </span>

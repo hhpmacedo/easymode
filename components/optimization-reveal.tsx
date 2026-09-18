@@ -34,7 +34,7 @@ export function OptimizationReveal({ meta, rawText }: { meta: EasyMetadata; rawT
         {routing.fallback && (
           <span className="text-xs text-amber">routing unavailable — used default</span>
         )}
-        {costs && <SavingsBadge savings={costs.savings} pct={costs.savingsPct} />}
+        {costs && <SavingsBadge tier={costs.tier} amount={costs.amount} pct={costs.pct} />}
         <span className="ml-auto text-[11px] uppercase tracking-wider text-muted">
           {open ? "hide" : "how?"}
         </span>
@@ -86,11 +86,25 @@ export function OptimizationReveal({ meta, rawText }: { meta: EasyMetadata; rawT
                     <td className="tabular text-right">{formatUSD(costs.baselineCost)}</td>
                   </tr>
                   <tr
-                    className={`border-t border-line ${costs.savings >= 0 ? "text-pine-deep" : "text-amber"}`}
+                    className={`border-t border-line ${
+                      costs.tier === "saved"
+                        ? "text-pine-deep"
+                        : costs.tier === "premium"
+                          ? "text-amber"
+                          : "text-muted"
+                    }`}
                   >
-                    <td className="font-medium">{costs.savings >= 0 ? "Saved" : "Premium paid"}</td>
+                    <td className="font-medium">
+                      {costs.tier === "saved"
+                        ? "Saved"
+                        : costs.tier === "premium"
+                          ? "Premium paid"
+                          : "Top model — no cheaper option"}
+                    </td>
                     <td className="tabular text-right font-medium">
-                      {formatUSD(Math.abs(costs.savings))}
+                      {costs.tier === "matched"
+                        ? `+${formatUSD(costs.amount)}`
+                        : formatUSD(costs.amount)}
                     </td>
                   </tr>
                 </tbody>
