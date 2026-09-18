@@ -53,6 +53,18 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           },
         };
       },
+      // Send only the turns the server needs (spec §7.1): the stored thread
+      // keeps every compacted turn, so posting all of it outgrows the route's
+      // body caps after a few cycles. Slice from the boundary message
+      // inclusive — assembleRequest ignores a throughMessageId it cannot
+      // find and would silently send the full thread — and it keeps the
+      // tier ratchet intact, since the boundary assistant carries its
+      // routing.finalModel.
+      prepareSendMessagesRequest: ({ messages, body }) => {
+        const c = store.getMeta(conversationId)?.compaction;
+        const idx = c ? messages.findIndex((m) => m.id === c.throughMessageId) : -1;
+        return { body: { ...body, messages: idx > 0 ? messages.slice(idx) : messages } };
+      },
     }),
   });
 
