@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageList } from "./message-list";
@@ -20,14 +20,10 @@ interface Props {
 
 export function ChatView({ conversationId, initialMessages, store, onMessagesChanged }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Reflect whether the user has connected their own key, so the empty state
-  // can invite them to. Subscription only (no setState in the effect body).
   const [hasUserKey, setHasUserKey] = useState<boolean>(() => !!getUserKey());
-  useEffect(() => {
-    const onChange = () => setHasUserKey(!!getUserKey());
-    window.addEventListener(KEY_CHANGE_EVENT, onChange);
-    return () => window.removeEventListener(KEY_CHANGE_EVENT, onChange);
-  }, []);
+  // A suggestion clicked before a key is connected: send it once they connect.
+  const pendingRef = useRef<string | null>(null);
+
   const { messages, sendMessage, status, error, regenerate } = useChat<EasyUIMessage>({
     id: conversationId,
     messages: initialMessages,
@@ -41,6 +37,33 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
       },
     }),
   });
+
+  // Track key connect/disconnect; flush a pending suggestion once connected.
+  // setState/send happen in the event callback, not the effect body.
+  useEffect(() => {
+    const onChange = () => {
+      const has = !!getUserKey();
+      setHasUserKey(has);
+      if (has && pendingRef.current) {
+        const text = pendingRef.current;
+        pendingRef.current = null;
+        setSettingsOpen(false);
+        sendMessage({ text });
+      }
+    };
+    window.addEventListener(KEY_CHANGE_EVENT, onChange);
+    return () => window.removeEventListener(KEY_CHANGE_EVENT, onChange);
+  }, [sendMessage]);
+
+  // A suggestion "just works": send it if a key is connected, otherwise open
+  // the key modal and send automatically once they connect.
+  const onSuggestion = (text: string) => {
+    if (getUserKey()) sendMessage({ text });
+    else {
+      pendingRef.current = text;
+      setSettingsOpen(true);
+    }
+  };
 
   // Persist on every change (spec §7 storage).
   useEffect(() => {
@@ -112,6 +135,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
         onRetry={() => regenerate()}
         needsKey={!hasUserKey}
         onConnectKey={() => setSettingsOpen(true)}
+        onSuggestion={onSuggestion}
       />
       <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
       {settingsOpen && <KeySettings onClose={() => setSettingsOpen(false)} />}
