@@ -23,3 +23,18 @@ export const PRICING: Record<
 export const BASELINE_MODEL: ModelId = "claude-opus-5";
 export const CLASSIFIER_MODEL: ModelId = "claude-haiku-4-5";
 export const DEFAULT_FALLBACK_MODEL: ModelId = "claude-sonnet-5";
+
+/** Prompt-cache pricing relative to the model's input rate (5-minute TTL). */
+export const CACHE_READ_MULTIPLIER = 0.1;
+export const CACHE_WRITE_MULTIPLIER = 1.25;
+
+/** Runaway guard on answer length, by tier — generous on purpose. The cost
+ *  control is the tier ratchet plus caching, not this cap (spec §3.3). */
+export const MAX_OUTPUT_TOKENS: Record<ModelId, number> = {
+  "claude-haiku-4-5": 8_000,
+  "claude-sonnet-5": 16_000,
+  "claude-opus-5": 32_000,
+  "claude-fable-5-1": 32_000,
+  "claude-opus-4-8": 32_000,
+  "claude-fable-5": 32_000,
+};

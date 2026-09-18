@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { costOf, turnCosts, conversationSavings, formatUSD } from "../costs";
+import { costOf, turnCosts, conversationSavings, formatUSD, formatTokens } from "../costs";
 
 const usage = { inputTokens: 1000, outputTokens: 2000 };
 const clsUsage = { inputTokens: 500, outputTokens: 100 };
@@ -11,6 +11,27 @@ describe("costOf", () => {
   });
   it("opus costs 5x haiku input, 5x output", () => {
     expect(costOf("claude-opus-4-8", usage)).toBeCloseTo(costOf("claude-haiku-4-5", usage) * 5, 10);
+  });
+  it("prices cache reads at 10% of the input rate", () => {
+    // 10,000 total input, of which 9,000 read from cache:
+    // 1,000 * 1.0 + 9,000 * 1.0 * 0.1 = 1,900 → 0.0019
+    const u = { inputTokens: 10_000, outputTokens: 0, cacheReadTokens: 9_000 };
+    expect(costOf("claude-haiku-4-5", u)).toBeCloseTo(0.0019, 10);
+  });
+  it("prices cache writes at 125% of the input rate", () => {
+    // 1,000 input, all written to cache: 1,000 * 1.0 * 1.25 = 1,250 → 0.00125
+    const u = { inputTokens: 1_000, outputTokens: 0, cacheWriteTokens: 1_000 };
+    expect(costOf("claude-haiku-4-5", u)).toBeCloseTo(0.00125, 10);
+  });
+  it("treats missing cache fields as zero (legacy stored turns)", () => {
+    expect(costOf("claude-haiku-4-5", { inputTokens: 1000, outputTokens: 2000 })).toBeCloseTo(
+      0.011,
+      10,
+    );
+  });
+  it("never prices negative uncached tokens if cache counts exceed the total", () => {
+    const u = { inputTokens: 100, outputTokens: 0, cacheReadTokens: 200 };
+    expect(costOf("claude-haiku-4-5", u)).toBeCloseTo((200 * 0.1) / 1_000_000, 12);
   });
 });
 
@@ -78,5 +99,17 @@ describe("formatUSD", () => {
   });
   it("shows dollar-scale with 2 decimals", () => {
     expect(formatUSD(1.5)).toBe("$1.50");
+  });
+});
+
+describe("formatTokens", () => {
+  it("shows small counts verbatim", () => {
+    expect(formatTokens(842)).toBe("842");
+  });
+  it("shows thousands with one decimal under 10K", () => {
+    expect(formatTokens(4_250)).toBe("4.3K");
+  });
+  it("shows whole thousands at 10K and above", () => {
+    expect(formatTokens(41_300)).toBe("41K");
   });
 });

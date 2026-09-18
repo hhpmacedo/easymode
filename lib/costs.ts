@@ -1,9 +1,24 @@
-import { BASELINE_MODEL, CLASSIFIER_MODEL, PRICING } from "./pricing";
+import {
+  BASELINE_MODEL,
+  CACHE_READ_MULTIPLIER,
+  CACHE_WRITE_MULTIPLIER,
+  CLASSIFIER_MODEL,
+  PRICING,
+} from "./pricing";
 import type { ModelId, TokenUsage } from "./types";
 
+/** USD for one call. Cached input is a subset of `inputTokens`: reads are
+ *  billed at 10% of the input rate, writes at 125% (spec §3.1). */
 export function costOf(model: ModelId, usage: TokenUsage): number {
   const p = PRICING[model];
-  return (usage.inputTokens * p.inputPerMTok + usage.outputTokens * p.outputPerMTok) / 1_000_000;
+  const read = usage.cacheReadTokens ?? 0;
+  const write = usage.cacheWriteTokens ?? 0;
+  const uncached = Math.max(0, usage.inputTokens - read - write);
+  const input =
+    uncached * p.inputPerMTok +
+    read * p.inputPerMTok * CACHE_READ_MULTIPLIER +
+    write * p.inputPerMTok * CACHE_WRITE_MULTIPLIER;
+  return (input + usage.outputTokens * p.outputPerMTok) / 1_000_000;
 }
 
 /** How a turn's cost compares to the always-baseline counterfactual:
@@ -91,4 +106,11 @@ export function formatUSD(n: number): string {
   const abs = Math.abs(n);
   const digits = abs < 0.01 ? 4 : abs < 1 ? 3 : 2;
   return `${n < 0 ? "-" : ""}$${abs.toFixed(digits)}`;
+}
+
+/** Compact token count for the UI: 842 · 4.3K · 41K. */
+export function formatTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}K`;
+  return `${Math.round(n / 1000)}K`;
 }
