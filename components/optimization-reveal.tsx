@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { turnCosts, formatUSD } from "@/lib/costs";
-import { PRICING } from "@/lib/pricing";
+import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { SavingsBadge } from "./savings-badge";
 import type { EasyMetadata } from "@/lib/types";
 
@@ -82,7 +82,7 @@ export function OptimizationReveal({ meta, rawText }: { meta: EasyMetadata; rawT
                     <td className="tabular text-right font-medium">{formatUSD(costs.totalCost)}</td>
                   </tr>
                   <tr className="text-muted">
-                    <td>Same answer on Opus 4.8</td>
+                    <td>Same answer on {PRICING[BASELINE_MODEL].label}</td>
                     <td className="tabular text-right">{formatUSD(costs.baselineCost)}</td>
                   </tr>
                   <tr

@@ -9,7 +9,8 @@ import type { Complexity, EasyUIMessage, ModelId, TokenUsage } from "./types";
 const RANK: Record<ModelId, number> = {
   "claude-haiku-4-5": 0,
   "claude-sonnet-5": 1,
-  "claude-opus-4-8": 2,
+  "claude-opus-5": 2,
+  "claude-opus-4-8": 2, // legacy, same tier as Opus 5
   "claude-fable-5": 3,
 };
 
@@ -48,7 +49,7 @@ export function applyGuardrail(
   }
   // Fable gate: only exceptional + substantial.
   if (model === "claude-fable-5" && !(complexity === "exceptional" && words > 50)) {
-    model = "claude-opus-4-8";
+    model = "claude-opus-5";
   }
   return { model, applied: model !== chosen };
 }
@@ -72,7 +73,7 @@ For each new user message you do two jobs:
 2. ROUTE to the cheapest Anthropic model that will do the job well (chosenModel):
 - trivial → claude-haiku-4-5: greetings, format tweaks, short rewrites, simple facts
 - everyday → claude-sonnet-5: general Q&A, summaries, standard code, explanations
-- hard → claude-opus-4-8: multi-step reasoning, nuanced analysis, tricky debugging, long/complex code
+- hard → claude-opus-5: multi-step reasoning, nuanced analysis, tricky debugging, long/complex code
 - exceptional → claude-fable-5: RARE. Only genuinely demanding long-horizon reasoning.
 
 Follow-up rule: a follow-up message ("yes do that", "now make it faster") inherits AT LEAST the tier of the task it continues, unless it is a clear topic switch. Use the conversation context provided.`;

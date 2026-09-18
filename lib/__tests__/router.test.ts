@@ -9,7 +9,7 @@ const MID20 = Array(20).fill("ponder").join(" "); // 15–50 words, no code
 
 describe("applyGuardrail", () => {
   it("caps short non-code messages at Sonnet", () => {
-    expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT)).toEqual({
+    expect(applyGuardrail("claude-opus-5", "everyday", SHORT)).toEqual({
       model: "claude-sonnet-5",
       applied: true,
     });
@@ -17,7 +17,7 @@ describe("applyGuardrail", () => {
   });
   it("does not cap short messages with multiple questions", () => {
     const multi = "why? how? really?";
-    expect(applyGuardrail("claude-opus-4-8", "hard", multi).model).toBe("claude-opus-4-8");
+    expect(applyGuardrail("claude-opus-5", "hard", multi).model).toBe("claude-opus-5");
   });
   it("floors code-bearing messages at Sonnet", () => {
     expect(applyGuardrail("claude-haiku-4-5", "trivial", CODE)).toEqual({
@@ -29,25 +29,23 @@ describe("applyGuardrail", () => {
     expect(applyGuardrail("claude-haiku-4-5", "trivial", LONG).model).toBe("claude-sonnet-5");
   });
   it("demotes Fable to Opus unless complexity is exceptional AND >50 words", () => {
-    expect(applyGuardrail("claude-fable-5", "hard", HARD60).model).toBe("claude-opus-4-8");
+    expect(applyGuardrail("claude-fable-5", "hard", HARD60).model).toBe("claude-opus-5");
     // 15–50 words: escapes the short-message cap, but still not substantial enough for Fable.
-    expect(applyGuardrail("claude-fable-5", "exceptional", MID20).model).toBe("claude-opus-4-8");
+    expect(applyGuardrail("claude-fable-5", "exceptional", MID20).model).toBe("claude-opus-5");
     expect(applyGuardrail("claude-fable-5", "exceptional", HARD60).model).toBe("claude-fable-5");
   });
   it("does not drop a short follow-up below the prior tier (criterion 3)", () => {
     // "now make it faster" after a hard/Opus task: cap must not undercut Opus.
-    expect(
-      applyGuardrail("claude-opus-4-8", "hard", "now make it faster", "claude-opus-4-8"),
-    ).toEqual({
-      model: "claude-opus-4-8",
+    expect(applyGuardrail("claude-opus-5", "hard", "now make it faster", "claude-opus-5")).toEqual({
+      model: "claude-opus-5",
       applied: false,
     });
     // Without a prior tier the cap still applies.
-    expect(applyGuardrail("claude-opus-4-8", "hard", "now make it faster").model).toBe(
+    expect(applyGuardrail("claude-opus-5", "hard", "now make it faster").model).toBe(
       "claude-sonnet-5",
     );
     // A prior tier at/below Sonnet does not weaken the cap.
-    expect(applyGuardrail("claude-opus-4-8", "everyday", SHORT, "claude-haiku-4-5").model).toBe(
+    expect(applyGuardrail("claude-opus-5", "everyday", SHORT, "claude-haiku-4-5").model).toBe(
       "claude-sonnet-5",
     );
   });

@@ -1,5 +1,6 @@
 "use client";
 import { formatUSD } from "@/lib/costs";
+import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 
 export function SavingsBadge({ savings, pct }: { savings: number; pct: number }) {
   const positive = savings >= 0;
@@ -10,7 +11,7 @@ export function SavingsBadge({ savings, pct }: { savings: number; pct: number })
           ? "border-pine/20 bg-pine-soft text-pine-deep"
           : "border-amber/20 bg-amber-soft text-amber"
       }`}
-      title="Estimated vs always using Opus 4.8, holding output length constant. Includes router cost."
+      title={`Estimated vs always using ${PRICING[BASELINE_MODEL].label}, holding output length constant. Includes router cost.`}
     >
       <span className="font-medium">{positive ? "saved" : "premium"}</span>
       <span className="tabular">

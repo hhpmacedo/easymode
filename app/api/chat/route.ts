@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
   let result = run(routing.finalModel);
 
-  // Fable refusal/availability: one retry on Opus 4.8 (spec §3.3 / §8). streamText
+  // Fable refusal/availability: one retry on Opus 5 (spec §3.3 / §8). streamText
   // never throws — a refusal surfaces as finishReason "content-filter" (Anthropic
   // stop_reason "refusal") and API/network failures reject the finishReason promise,
   // so await completion (the result stream is buffered and replayable) and retry.
@@ -86,10 +86,10 @@ export async function POST(req: Request) {
     if (declined) {
       routing = {
         ...routing,
-        finalModel: "claude-opus-4-8",
-        reasoning: routing.reasoning + " (Fable declined — retried on Opus 4.8.)",
+        finalModel: "claude-opus-5",
+        reasoning: routing.reasoning + " (Fable declined — retried on Opus 5.)",
       };
-      result = run("claude-opus-4-8");
+      result = run("claude-opus-5");
     }
   }
 

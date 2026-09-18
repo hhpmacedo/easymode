@@ -3,7 +3,8 @@ import type { UIMessage } from "ai";
 export const MODEL_IDS = [
   "claude-haiku-4-5",
   "claude-sonnet-5",
-  "claude-opus-4-8",
+  "claude-opus-5",
+  "claude-opus-4-8", // legacy — retained for stored conversations
   "claude-fable-5",
 ] as const;
 export type ModelId = (typeof MODEL_IDS)[number];
