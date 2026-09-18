@@ -89,7 +89,7 @@ Extract ONLY facts that will still be true and useful weeks from now:
 
 Rules:
 - Facts about the person, not about the assistant, and not about the specific task of this conversation (a bug they fixed today is not a memory; that they work in Rust is).
-- Nothing sensitive unless they explicitly ask to remember it: health, finances, relationships, religion, politics, credentials, addresses.
+- Nothing sensitive unless they explicitly ask to remember it: health, finances, relationships, religion, politics, credentials, addresses. An explicit ask ("remember this", "keep in mind", "note for the future") IS the consent: keep what they asked for, even when it is personal.
 - Prefer what the user stated over what the assistant inferred.
 - One fact per item, one line, under ${PROMPT_LINE_CHARS} characters, in the third person ("Prefers pnpm"), in the user's language.
 - Do not repeat an existing memory. If a new statement refines one, put it in \`update\` with that memory's id. If a statement contradicts one, \`archive\` the old id and \`add\` the new fact.

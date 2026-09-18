@@ -34,10 +34,13 @@
     "forbid": ["diabetes", "mortgage", "300k"]
   },
   {
-    "name": "explicit remember overrides",
+    "name": "explicit ask keeps a personal fact",
     "turns": [
-      ["user", "remember: my daughter Ana is allergic to peanuts, always check recipes for that"],
-      ["assistant", "Noted: I'll check recipes for peanuts."],
+      [
+        "user",
+        "Please remember this for any future recipe question: my daughter Ana is allergic to peanuts, so always check recipes for peanuts."
+      ],
+      ["assistant", "Noted: I'll check every recipe for peanuts."],
       ["user", "ok give me a quick dinner idea"],
       ["assistant", "Here's a peanut-free option..."]
     ],

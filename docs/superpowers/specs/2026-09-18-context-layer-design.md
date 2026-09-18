@@ -373,7 +373,7 @@ bounded by the existing token gate and body caps.
 ## 8. Storage and settings
 
 - `easymode:settings` → `{ instructions: string; compactThreshold: number; memoryEnabled: boolean }`
-- `easymode:memory` → `Memory[]`
+- `easymode:memory` → `{ memories: Memory[], costs: Record<"YYYY-MM", number> }` (memories plus the extraction cost ledger)
 - `ConversationMeta` += `compaction?`, `extractedThrough?`
 - Typed accessors on `ConversationStore`; export includes memory + settings.
 

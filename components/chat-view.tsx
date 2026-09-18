@@ -101,7 +101,6 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
     if (cmd) {
       const m = memoryStore.add(cmd.memory, "fact", "user");
       window.dispatchEvent(new CustomEvent<Memory[]>(MEMORY_ADDED_EVENT, { detail: [m] }));
-      if (!cmd.rest.trim()) return;
       sendMessage({ text: cmd.rest });
       return;
     }
@@ -177,7 +176,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
           <button
             onClick={() => setSettings("key")}
             className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
-            title="Settings: API key, instructions"
+            title="Settings: API key, instructions, memory, context"
           >
             Settings
           </button>

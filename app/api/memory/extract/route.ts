@@ -1,6 +1,6 @@
 import { resolveExtractAuth } from "@/lib/auth";
 import { providerFor } from "@/lib/provider";
-import { readJsonBody, runJob } from "@/lib/api-helpers";
+import { logJobError, readJsonBody, runJob } from "@/lib/api-helpers";
 import { extractionSchema, MEMORY_TEXT_MAX } from "@/lib/memory";
 import {
   EXTRACTION_SYSTEM,
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     );
     return Response.json({ result: resolveAliases(result, memories), usage });
   } catch (err) {
-    console.error("[easymode] memory extraction failed:", err);
+    logJobError("memory extraction failed", err);
     return Response.json({ error: "Memory extraction failed." }, { status: 502 });
   }
 }

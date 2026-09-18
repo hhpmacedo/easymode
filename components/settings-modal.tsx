@@ -150,12 +150,18 @@ function InstructionsPanel() {
 function MemoryPanel() {
   const [store] = useState(() => browserMemoryStore());
   const [memories, setMemories] = useState<Memory[]>(() => store.active());
+  const [archived, setArchived] = useState<Memory[]>(() =>
+    store.list().filter((m) => m.status === "archived"),
+  );
   const [enabled, setEnabled] = useState(() => getSettings().memoryEnabled);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
-    const refresh = () => setMemories(store.active());
+    const refresh = () => {
+      setMemories(store.active());
+      setArchived(store.list().filter((m) => m.status === "archived"));
+    };
     window.addEventListener(MEMORY_CHANGE_EVENT, refresh);
     return () => window.removeEventListener(MEMORY_CHANGE_EVENT, refresh);
   }, [store]);
@@ -201,7 +207,9 @@ function MemoryPanel() {
                 value={editing.text}
                 onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
                 onBlur={() => {
-                  store.update(m.id, editing.text);
+                  // An emptied line keeps the old text; use Forget to remove it.
+                  const t = editing.text.trim();
+                  if (t && t !== m.text) store.update(m.id, t);
                   setEditing(null);
                 }}
                 onKeyDown={(e) => {
@@ -231,6 +239,29 @@ function MemoryPanel() {
           </div>
         ))}
       </div>
+
+      {archived.length > 0 && (
+        <details className="text-[12px] text-muted">
+          <summary className="cursor-pointer select-none">
+            Forgotten ({archived.length}) — including anything an extraction replaced
+          </summary>
+          <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto">
+            {archived.map((m) => (
+              <div key={m.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1">
+                <span className="flex-1 text-ink-soft line-through decoration-line-strong">
+                  {m.text}
+                </span>
+                <button
+                  onClick={() => store.restore(m.id)}
+                  className="rounded-lg border border-line px-2 py-0.5 text-[11px] hover:bg-paper"
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       <div className="flex items-center justify-between text-[12px] text-muted">
         <span>Extraction this month: {formatUSD(store.monthCost())}</span>
