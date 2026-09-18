@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
+import type { AnthropicProvider } from "./provider";
 import { z } from "zod";
 import { CLASSIFIER_MODEL, PRICING } from "./pricing";
 import { COMPLEXITIES, MODEL_IDS, messageText } from "./types";
@@ -103,10 +104,15 @@ export interface ClassifyResult {
   usage: TokenUsage;
 }
 
-/** One Haiku call: classify + rewrite + route. Throws on failure (caller falls back). */
-export async function classify(history: EasyUIMessage[], rawText: string): Promise<ClassifyResult> {
+/** One Haiku call: classify + rewrite + route. Throws on failure (caller falls back).
+ *  `provider` selects whose key pays — the caller's (BYOK) or the server's. */
+export async function classify(
+  history: EasyUIMessage[],
+  rawText: string,
+  provider: AnthropicProvider = anthropic,
+): Promise<ClassifyResult> {
   const { object, usage } = await generateObject({
-    model: anthropic(CLASSIFIER_MODEL),
+    model: provider(CLASSIFIER_MODEL),
     schema: classifierSchema,
     system: CLASSIFIER_SYSTEM,
     prompt: buildClassifierPrompt(history, rawText),

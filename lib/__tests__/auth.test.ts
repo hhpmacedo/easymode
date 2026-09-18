@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   SESSION_COOKIE,
   authMode,
@@ -8,6 +8,8 @@ import {
   sessionCookie,
   sessionValue,
   verifyToken,
+  extractUserKey,
+  resolveChatAuth,
 } from "../auth";
 
 const TOKEN = "correct-horse-battery-staple";
@@ -87,5 +89,46 @@ describe("cookies", () => {
     expect(sessionValue(TOKEN)).not.toContain(TOKEN);
     expect(sessionValue(TOKEN)).toBe(sessionValue(TOKEN));
     expect(sessionValue(TOKEN)).not.toBe(sessionValue(TOKEN + "x"));
+  });
+});
+
+describe("extractUserKey", () => {
+  const GOODKEY = "sk-ant-api03-" + "a".repeat(40);
+  it("returns a well-formed key from the header", () => {
+    expect(extractUserKey(req("https://x/", { "x-anthropic-key": GOODKEY }))).toBe(GOODKEY);
+  });
+  it("ignores junk and a missing header", () => {
+    expect(extractUserKey(req("https://x/", { "x-anthropic-key": "nope" }))).toBeUndefined();
+    expect(extractUserKey(req("https://x/"))).toBeUndefined();
+  });
+});
+
+describe("resolveChatAuth", () => {
+  const GOODKEY = "sk-ant-api03-" + "a".repeat(40);
+  const ipReq = (ip: string, headers: Record<string, string> = {}) =>
+    req("https://x/", { "x-forwarded-for": ip, ...headers });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("bills a user key and bypasses the token gate even when closed", () => {
+    vi.stubEnv("EASYMODE_ACCESS_TOKEN", "");
+    vi.stubEnv("NODE_ENV", "production");
+    const r = resolveChatAuth(ipReq("10.9.0.1", { "x-anthropic-key": GOODKEY }));
+    expect(r.denied).toBeNull();
+    expect(r.apiKey).toBe(GOODKEY);
+  });
+
+  it("uses the server key behind the token gate when no user key", () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-server-xxxxxxxxxxxxxxxxxxxxxx");
+    vi.stubEnv("EASYMODE_ACCESS_TOKEN", TOKEN);
+    expect(resolveChatAuth(ipReq("10.9.0.2")).denied?.status).toBe(401);
+    const ok = resolveChatAuth(ipReq("10.9.0.3", { authorization: `Bearer ${TOKEN}` }));
+    expect(ok.denied).toBeNull();
+    expect(ok.apiKey).toBeUndefined();
+  });
+
+  it("asks to connect a key when neither user nor server key exists", () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("EASYMODE_ACCESS_TOKEN", TOKEN);
+    expect(resolveChatAuth(ipReq("10.9.0.4")).denied?.status).toBe(400);
   });
 });

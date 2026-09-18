@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageList } from "./message-list";
 import { Composer } from "./composer";
+import { KeySettings } from "./key-settings";
 import { turnCosts, formatUSD } from "@/lib/costs";
+import { getUserKey } from "@/lib/client-key";
 import type { ConversationStore } from "@/lib/storage";
 import type { EasyUIMessage } from "@/lib/types";
 
@@ -16,10 +18,19 @@ interface Props {
 }
 
 export function ChatView({ conversationId, initialMessages, store, onMessagesChanged }: Props) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { messages, sendMessage, status, error, regenerate } = useChat<EasyUIMessage>({
     id: conversationId,
     messages: initialMessages,
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      // Read the key at send time so connecting/disconnecting takes effect
+      // immediately. Sent only when present; omitted → server key path.
+      headers: (): Record<string, string> => {
+        const key = getUserKey();
+        return key ? { "x-anthropic-key": key } : {};
+      },
+    }),
   });
 
   // Persist on every change (spec §7 storage).
@@ -50,9 +61,18 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex h-14 items-center justify-between border-b border-line bg-paper/80 px-6 backdrop-blur">
-        <h1 className="text-[13px] font-medium uppercase tracking-[0.14em] text-muted">
-          Conversation
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-[13px] font-medium uppercase tracking-[0.14em] text-muted">
+            Conversation
+          </h1>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-soft transition-colors hover:bg-surface"
+            title="Connect your Anthropic key"
+          >
+            API key
+          </button>
+        </div>
         {total.baseline > 0 && (
           <span className="flex items-center gap-2 text-xs text-muted">
             <strong
@@ -73,6 +93,7 @@ export function ChatView({ conversationId, initialMessages, store, onMessagesCha
       </header>
       <MessageList messages={messages} status={status} error={error} onRetry={() => regenerate()} />
       <Composer disabled={busy} onSend={(text) => sendMessage({ text })} />
+      {settingsOpen && <KeySettings onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
