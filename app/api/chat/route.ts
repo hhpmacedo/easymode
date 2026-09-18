@@ -2,6 +2,7 @@ import { streamText } from "ai";
 import { classify, applyGuardrail, atLeastTier, priorTier, rewriteGuard } from "@/lib/router";
 import { latestUserText } from "@/lib/history";
 import { assembleRequest, todayISO } from "@/lib/context";
+import { parseCompactionContext } from "@/lib/compaction";
 import { DEFAULT_FALLBACK_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/pricing";
 import { BASE_PROMPT, PROMPT_VERSION } from "@/lib/prompts/base";
 import { INSTRUCTIONS_MAX } from "@/lib/settings";
@@ -18,10 +19,20 @@ import { providerFor } from "@/lib/provider";
 
 export const maxDuration = 120;
 
-// Caps on what one request may push through the paid API (a 200 KB body is
-// far past any real conversation this UI produces).
-const MAX_BODY_BYTES = 200_000;
-const MAX_MESSAGES = 200;
+// Caps on what one request may push through the paid API. They must clear
+// one compaction cycle's worth of thread: a measured 150K-token thread (the
+// threshold ceiling) serialises to ~900K chars over ~650 messages once
+// assistant metadata (routing reasoning, prompt copy) and JSON framing are
+// included, so roughly twice that. Spec §7.1's 200 KB cap would 413 before
+// the first compaction at any threshold above ~30K tokens (plan deviation 3).
+// These caps only bound a single cycle, though: compacted turns stay in
+// storage, so a client that keeps sending the whole thread outgrows them on
+// its third cycle at the ceiling (fifth or sixth at the 60K default). The
+// transport must send only the turns from `compaction.throughMessageId`
+// onward (the boundary message included, since assembleRequest ignores a
+// boundary it cannot find) for long conversations to keep working.
+const MAX_BODY_BYTES = 2_000_000;
+const MAX_MESSAGES = 1_000;
 
 export async function POST(req: Request) {
   // Decide who pays (the caller's key or the server's) and whether they may
@@ -44,7 +55,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Malformed JSON body." }, { status: 400 });
   }
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
-    return Response.json({ error: "Expected 1–200 messages." }, { status: 400 });
+    return Response.json({ error: `Expected 1–${MAX_MESSAGES} messages.` }, { status: 400 });
   }
   // The client owns instructions (spec §7.4); the server only bounds them.
   const instructions = typeof context.instructions === "string" ? context.instructions : "";
@@ -54,6 +65,9 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // A malformed compaction is ignored, not rejected: the client owns it and
+  // the worst case is sending the full thread (spec §6.3, §7.4).
+  const compaction = parseCompactionContext(context.compaction);
   if (context.promptVersion && context.promptVersion !== PROMPT_VERSION) {
     console.warn(
       `[easymode] client prompt version ${context.promptVersion} ≠ server ${PROMPT_VERSION}`,
@@ -109,6 +123,7 @@ export async function POST(req: Request) {
       ...assembleRequest({
         base: BASE_PROMPT,
         instructions,
+        compaction,
         messages,
         optimizedPrompt: routing.optimizedPrompt,
         today,

@@ -34,11 +34,19 @@ they cost almost nothing per turn. Instructions live in your browser only.
 Messages under 15 words are sent exactly as written; longer ones are tuned into a
 precise prompt first.
 
+Long conversations are compacted: when the context passes the threshold in
+**Settings → Context** (default 60K tokens), the older turns are summarized in
+the background into a structured note — goal, decisions, facts, artifacts, open
+threads — that the model reads instead of those turns. The note appears in the
+thread where the cut was made; open it to read or edit it. The header shows the
+estimated context size your next message will carry, and lets you compact now.
+
 ## Scripts
 
     npm test          # unit tests (guardrail, cost math, storage, history)
     npm run eval      # routing eval fixture vs live classifier (needs API key)
     npm run eval:cache  # prompt-cache tripwire: turn two must read from cache (needs API key)
+    npm run eval:compact  # compaction keeps the facts it must (needs API key)
     npx playwright test  # e2e smoke (needs API key)
 
 ## Development

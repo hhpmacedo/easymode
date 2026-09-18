@@ -1,9 +1,16 @@
 "use client";
 import { useState } from "react";
 import { KeyPanel } from "./key-settings";
-import { getSettings, setInstructions, INSTRUCTIONS_MAX } from "@/lib/settings";
+import {
+  getSettings,
+  setInstructions,
+  setCompactThreshold,
+  INSTRUCTIONS_MAX,
+  COMPACT_THRESHOLD_MIN,
+  COMPACT_THRESHOLD_MAX,
+} from "@/lib/settings";
 
-export type SettingsTab = "key" | "instructions";
+export type SettingsTab = "key" | "instructions" | "context";
 
 /** The Settings modal (spec §8): API key · Instructions. Memory and Context
  *  tabs arrive with plans 3–4. Opens from the header; `initialTab` lets the
@@ -44,6 +51,7 @@ export function SettingsModal({
             [
               ["key", "API key"],
               ["instructions", "Instructions"],
+              ["context", "Context"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -62,7 +70,15 @@ export function SettingsModal({
           ))}
         </div>
 
-        <div className="mt-4">{tab === "key" ? <KeyPanel /> : <InstructionsPanel />}</div>
+        <div className="mt-4">
+          {tab === "key" ? (
+            <KeyPanel />
+          ) : tab === "instructions" ? (
+            <InstructionsPanel />
+          ) : (
+            <ContextPanel />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -117,6 +133,42 @@ function InstructionsPanel() {
           </button>
         </span>
       </div>
+    </div>
+  );
+}
+
+/** Compaction threshold (spec §6.1): when a conversation's context passes it,
+ *  older turns are summarized in the background after the next answer. */
+function ContextPanel() {
+  const [value, setValue] = useState(() => getSettings().compactThreshold);
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] leading-relaxed text-ink-soft">
+        Long conversations get expensive because every message re-sends the whole thread. When a
+        conversation grows past this size, EasyMode summarizes the older turns into a compact note
+        the model reads instead — you can see and edit it in the thread.
+      </p>
+      <label className="block text-[13px] text-ink">
+        Compact when a conversation exceeds{" "}
+        <strong className="tabular">{Math.round(value / 1000)}K</strong> tokens
+        <input
+          type="range"
+          min={COMPACT_THRESHOLD_MIN}
+          max={COMPACT_THRESHOLD_MAX}
+          step={10_000}
+          value={value}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setValue(v);
+            setCompactThreshold(v);
+          }}
+          className="mt-2 w-full"
+          aria-label="Compaction threshold"
+        />
+      </label>
+      <p className="text-[12px] text-muted">
+        Default 60K. Lower saves more; higher keeps more verbatim detail.
+      </p>
     </div>
   );
 }

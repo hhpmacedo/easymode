@@ -69,3 +69,25 @@ describe("ConversationStore", () => {
     expect(st.list()).toEqual([]);
   });
 });
+
+describe("compaction meta", () => {
+  const compaction = {
+    throughMessageId: "a2",
+    summary: { goal: "g", decisions: [], facts: [], artifacts: [], open: [] },
+    tokensBefore: 52_000,
+    createdAt: 1,
+    edited: false,
+  };
+  it("stores and clears a conversation's compaction without touching updatedAt", () => {
+    const store = new ConversationStore(fakeStorage());
+    const meta = store.create();
+    store.setCompaction(meta.id, compaction);
+    expect(store.getMeta(meta.id)?.compaction).toEqual(compaction);
+    expect(store.getMeta(meta.id)?.updatedAt).toBe(meta.updatedAt);
+    store.setCompaction(meta.id, undefined);
+    expect(store.getMeta(meta.id)?.compaction).toBeUndefined();
+  });
+  it("getMeta returns undefined for an unknown id", () => {
+    expect(new ConversationStore(fakeStorage()).getMeta("nope")).toBeUndefined();
+  });
+});

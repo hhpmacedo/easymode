@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { OptimizationReveal } from "./optimization-reveal";
+import { CompactionCard } from "./compaction-card";
 import { messageText } from "@/lib/types";
-import type { EasyUIMessage } from "@/lib/types";
+import type { Compaction, CompactionSummary, EasyUIMessage } from "@/lib/types";
 
 // Deliberately lazy, casual prompts that span the routing tiers, so a new user
 // sees the rewrite AND different models: haiku → Haiku, email → Sonnet,
@@ -25,6 +26,8 @@ interface Props {
   needsKey?: boolean;
   onConnectKey?: () => void;
   onSuggestion?: (text: string) => void;
+  compaction?: Compaction;
+  onSaveCompaction?: (summary: CompactionSummary) => void;
 }
 
 export function MessageList({
@@ -35,6 +38,8 @@ export function MessageList({
   needsKey,
   onConnectKey,
   onSuggestion,
+  compaction,
+  onSaveCompaction,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -55,6 +60,12 @@ export function MessageList({
       : status === "streaming" && lastAssistant && !messageText(lastAssistant)
         ? "Routing…"
         : null;
+
+  // Turns through the compaction boundary are still shown, greyed: the model
+  // no longer sees them (spec §6.4). The card sits right after the boundary.
+  const boundary = compaction
+    ? messages.findIndex((m) => m.id === compaction.throughMessageId)
+    : -1;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -94,27 +105,34 @@ export function MessageList({
             </div>
           </div>
         )}
-        {messages.map((m, i) =>
-          m.role === "user" ? (
-            <div key={m.id} className="animate-rise flex justify-end">
+        {messages.map((m, i) => (
+          <Fragment key={m.id}>
+            {m.role === "user" ? (
               <div
-                data-testid="user-bubble"
-                className="max-w-[80%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] whitespace-pre-wrap text-paper shadow-[0_2px_8px_rgba(29,26,21,0.15)]"
+                className={`animate-rise flex justify-end${boundary >= 0 && i <= boundary ? " opacity-50" : ""}`}
               >
-                {messageText(m)}
-              </div>
-            </div>
-          ) : (
-            <div key={m.id} className="animate-rise">
-              <div className="answer-prose text-[15px] leading-relaxed">
-                <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                <div
+                  data-testid="user-bubble"
+                  className="max-w-[80%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] whitespace-pre-wrap text-paper shadow-[0_2px_8px_rgba(29,26,21,0.15)]"
+                >
                   {messageText(m)}
-                </Markdown>
+                </div>
               </div>
-              {m.metadata && <OptimizationReveal meta={m.metadata} rawText={rawBefore(i)} />}
-            </div>
-          ),
-        )}
+            ) : (
+              <div className={`animate-rise${boundary >= 0 && i <= boundary ? " opacity-50" : ""}`}>
+                <div className="answer-prose text-[15px] leading-relaxed">
+                  <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                    {messageText(m)}
+                  </Markdown>
+                </div>
+                {m.metadata && <OptimizationReveal meta={m.metadata} rawText={rawBefore(i)} />}
+              </div>
+            )}
+            {i === boundary && compaction && onSaveCompaction && (
+              <CompactionCard compaction={compaction} onSave={onSaveCompaction} />
+            )}
+          </Fragment>
+        ))}
         {stage && <p className="shimmer-text text-sm">{stage}</p>}
         {status === "error" && (
           <div className="animate-rise flex items-center gap-3 rounded-xl border border-rust/25 bg-rust-soft px-4 py-3 text-sm text-rust">
