@@ -1,10 +1,10 @@
 import { streamText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
 import { classify, applyGuardrail, priorTier } from "@/lib/router";
 import { buildModelMessages, latestUserText } from "@/lib/history";
 import { DEFAULT_FALLBACK_MODEL } from "@/lib/pricing";
 import type { EasyMetadata, EasyUIMessage, RoutingDecision, TokenUsage } from "@/lib/types";
-import { guardChat } from "@/lib/auth";
+import { resolveChatAuth } from "@/lib/auth";
+import { providerFor } from "@/lib/provider";
 
 export const maxDuration = 120;
 
@@ -14,9 +14,11 @@ const MAX_BODY_BYTES = 200_000;
 const MAX_MESSAGES = 200;
 
 export async function POST(req: Request) {
-  // This route spends ANTHROPIC_API_KEY credit: token gate + rate limit first.
-  const denied = guardChat(req);
-  if (denied) return denied;
+  // Decide who pays (the caller's key or the server's) and whether they may
+  // proceed. A caller with its own key bypasses the shared-key access gate.
+  const auth = resolveChatAuth(req);
+  if (auth.denied) return auth.denied;
+  const provider = providerFor(auth.apiKey);
 
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) {
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
   let routing: RoutingDecision;
   let classifierUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   try {
-    const { decision, usage } = await classify(history, rawText);
+    const { decision, usage } = await classify(history, rawText, provider);
     const { model, applied } = applyGuardrail(
       decision.chosenModel,
       decision.complexity,
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
   // 2. Stream the answer from the chosen model, with optimized-prompt history.
   const run = (model: string) =>
     streamText({
-      model: anthropic(model),
+      model: provider(model),
       messages: buildModelMessages(messages, routing.optimizedPrompt),
     });
 

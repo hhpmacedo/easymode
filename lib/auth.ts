@@ -13,6 +13,10 @@
  *    allowed, for `npm run dev` convenience. Any other host is denied. */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { RateLimiter, clientKey } from "./rate-limit";
+import { isAnthropicKeyFormat } from "./provider";
+
+/** Header a browser/script uses to bill an Anthropic request to its own key. */
+export const USER_KEY_HEADER = "x-anthropic-key";
 
 export const SESSION_COOKIE = "easymode_session";
 export const SESSION_MAX_AGE_SEC = 30 * 24 * 60 * 60; // 30 days
@@ -115,9 +119,11 @@ export function sessionCookie(req: Request, value: string, maxAgeSec = SESSION_M
   return attrs.join("; ");
 }
 
-// One limiter per process: chat calls burn API credit, login attempts guess the token.
+// One limiter per process: chat calls burn API credit, login attempts guess the
+// token, key-validation pings could brute-check stolen keys through our proxy.
 const chatLimiter = new RateLimiter({ limit: 30, windowMs: 10 * 60_000 });
 const loginLimiter = new RateLimiter({ limit: 10, windowMs: 15 * 60_000 });
+const validateLimiter = new RateLimiter({ limit: 20, windowMs: 15 * 60_000 });
 
 const CLOSED_MESSAGE =
   "EASYMODE_ACCESS_TOKEN is not configured, so the API is disabled in production. " +
@@ -160,4 +166,68 @@ export function guardLogin(req: Request): Response | null {
     );
   }
   return null;
+}
+
+/** Rate-limit the key-validation endpoint. No token gate: BYOK validation must
+ *  work on a deployment that has no shared secret configured. */
+export function guardValidate(req: Request): Response | null {
+  const verdict = validateLimiter.check(clientKey(req));
+  if (!verdict.allowed) {
+    return json(
+      429,
+      { error: "Too many attempts. Try again later." },
+      { "Retry-After": String(verdict.retryAfterSec) },
+    );
+  }
+  return null;
+}
+
+/** The caller's own Anthropic key, if they sent a well-formed one. Junk is
+ *  ignored (treated as absent) so the shared-key path can still handle it. */
+export function extractUserKey(req: Request): string | undefined {
+  const raw = req.headers.get(USER_KEY_HEADER)?.trim();
+  return raw && isAnthropicKeyFormat(raw) ? raw : undefined;
+}
+
+function hasServerKey(): boolean {
+  return !!process.env.ANTHROPIC_API_KEY?.trim();
+}
+
+const CONNECT_MESSAGE =
+  "No Anthropic key available. Connect your own key in Settings to start chatting.";
+
+export interface ChatAuth {
+  /** Send this instead of running the handler; null means proceed. */
+  denied: Response | null;
+  /** The key to bill this request to; undefined means the server env key. */
+  apiKey?: string;
+}
+
+/** Decide who pays for a chat request and whether it may proceed.
+ *
+ *  Precedence:
+ *  1. The caller brought its own key → bill them; bypass the shared-key gate
+ *     (they can't spend our credit), but still rate-limit to protect the proxy.
+ *  2. No user key, a server key is configured → shared mode: full access-token
+ *     gate (guardChat) and bill our env key.
+ *  3. Neither → nothing to serve: 400 telling them to connect a key. */
+export function resolveChatAuth(req: Request): ChatAuth {
+  const userKey = extractUserKey(req);
+  if (userKey) {
+    const verdict = chatLimiter.check(clientKey(req));
+    if (!verdict.allowed) {
+      return {
+        denied: json(
+          429,
+          { error: "Too many requests. Try again shortly." },
+          { "Retry-After": String(verdict.retryAfterSec) },
+        ),
+      };
+    }
+    return { denied: null, apiKey: userKey };
+  }
+  if (hasServerKey()) {
+    return { denied: guardChat(req), apiKey: undefined };
+  }
+  return { denied: json(400, { error: CONNECT_MESSAGE }) };
 }
