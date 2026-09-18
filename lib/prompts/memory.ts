@@ -1,9 +1,11 @@
 /** Prompts and payload limits for the memory-extraction job (spec §5.3).
  *  Server only. The route clips whatever the client sends to these limits, so
  *  a real conversation is never rejected and Haiku's input stays bounded. */
+import type { ExtractionResult } from "../memory";
 import type { Memory } from "../types";
 
 export type ExtractionTurn = { role: "user" | "assistant"; text: string };
+export type ExtractionMemory = Pick<Memory, "id" | "text" | "kind">;
 
 /** Most turns one extraction call reads; clipTurns keeps the newest. */
 export const MAX_TURNS = 80;
@@ -17,6 +19,57 @@ export function clipTurns(turns: ExtractionTurn[]): ExtractionTurn[] {
   return turns
     .slice(-MAX_TURNS)
     .map((t) => ({ role: t.role, text: t.text.slice(0, MAX_TURN_CHARS) }));
+}
+
+/** Most existing memories one extraction call sees. */
+export const MAX_MEMORIES = 300;
+
+/** Clip rather than reject, for the same reason as clipTurns: a 400 here
+ *  would stall every later extraction — including consolidation, the only
+ *  thing that shrinks the list — until the user pruned by hand. Keep the
+ *  FIRST rows: the client sends creation order, so those are the oldest, and
+ *  consolidation merges from the front. Trade-off: rows past the cap are
+ *  invisible to this call, so they cannot be updated or archived by it, and a
+ *  fact restated may come back as an `add`; the client's near-duplicate check
+ *  in mergeMemories absorbs most of those. */
+export function clipMemories(memories: ExtractionMemory[]): ExtractionMemory[] {
+  return memories.slice(0, MAX_MEMORIES);
+}
+
+/** Rows are labelled m1..mN in the prompt rather than with the client's ids:
+ *  update/archive only work when Haiku echoes an id byte-exact, and a 36-char
+ *  UUID copied 50 times per call is a real miss rate (and ~11K chars of
+ *  prompt at 300 rows). The route maps aliases back with resolveAliases. */
+function aliasFor(index: number): string {
+  return `m${index + 1}`;
+}
+
+const ALIAS = /^m?(\d+)$/i;
+
+/** Translate the aliases in `update`/`archive` back to the ids of the rows
+ *  buildExtractionPrompt was given (same list, same order). An alias that
+ *  names no row is dropped, so a mis-copied one never reaches the client as
+ *  a junk id. `add` passes through untouched. */
+export function resolveAliases(
+  result: ExtractionResult,
+  memories: ExtractionMemory[],
+): ExtractionResult {
+  const realId = (alias: string): string | undefined => {
+    const m = ALIAS.exec(alias.trim());
+    if (!m) return undefined;
+    return memories[Number(m[1]) - 1]?.id;
+  };
+  return {
+    add: result.add,
+    update: result.update.flatMap((u) => {
+      const id = realId(u.id);
+      return id ? [{ id, text: u.text }] : [];
+    }),
+    archive: result.archive.flatMap((a) => {
+      const id = realId(a);
+      return id ? [id] : [];
+    }),
+  };
 }
 
 /** What the prompt asks per line: ~25% under extractionSchema's hard
@@ -46,11 +99,11 @@ export const CONSOLIDATE_NOTE = `The memory list has grown past its size limit. 
 
 export function buildExtractionPrompt(
   turns: ExtractionTurn[],
-  memories: Pick<Memory, "id" | "text" | "kind">[],
+  memories: ExtractionMemory[],
   consolidate = false,
 ): string {
   const known = memories.length
-    ? `EXISTING MEMORIES (id · kind · text):\n${memories.map((m) => `${m.id} · ${m.kind} · ${m.text}`).join("\n")}`
+    ? `EXISTING MEMORIES (id · kind · text):\n${memories.map((m, i) => `${aliasFor(i)} · ${m.kind} · ${m.text}`).join("\n")}`
     : "EXISTING MEMORIES: none";
   const transcript = turns
     .map((t) => `${t.role === "user" ? "USER" : "ASSISTANT"}: ${t.text}`)
