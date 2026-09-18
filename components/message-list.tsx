@@ -12,9 +12,11 @@ interface Props {
   status: "submitted" | "streaming" | "ready" | "error";
   error?: Error;
   onRetry: () => void;
+  needsKey?: boolean;
+  onConnectKey?: () => void;
 }
 
-export function MessageList({ messages, status, error, onRetry }: Props) {
+export function MessageList({ messages, status, error, onRetry, needsKey, onConnectKey }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,6 +48,14 @@ export function MessageList({ messages, status, error, onRetry }: Props) {
             <p className="mt-2 text-sm text-muted">
               Every message is rewritten and routed to the cheapest capable Claude model.
             </p>
+            {needsKey && (
+              <button
+                onClick={onConnectKey}
+                className="mt-6 rounded-xl bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-ink-soft"
+              >
+                Connect your Anthropic key to start
+              </button>
+            )}
           </div>
         )}
         {messages.map((m, i) =>

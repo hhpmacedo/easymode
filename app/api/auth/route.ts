@@ -1,15 +1,11 @@
-import {
-  guardClosed,
-  guardLogin,
-  isAuthenticated,
-  sessionCookie,
-  sessionValue,
-  verifyToken,
-} from "@/lib/auth";
+import { doorState, guardLogin, sessionCookie, sessionValue, verifyToken } from "@/lib/auth";
 
-/** Is the caller already allowed in? 204 yes, 401 no, 503 misconfigured. */
+/** May this visitor use the app? 204 open · 401 needs the access token · 503
+ *  misconfigured. BYOK deployments (no server key) are always open. */
 export async function GET(req: Request) {
-  return guardClosed() ?? new Response(null, { status: isAuthenticated(req) ? 204 : 401 });
+  const state = doorState(req);
+  const status = state === "open" ? 204 : state === "locked" ? 401 : 503;
+  return new Response(null, { status });
 }
 
 /** Exchange the access token for an HttpOnly session cookie. */

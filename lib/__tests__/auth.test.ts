@@ -10,6 +10,7 @@ import {
   verifyToken,
   extractUserKey,
   resolveChatAuth,
+  doorState,
 } from "../auth";
 
 const TOKEN = "correct-horse-battery-staple";
@@ -130,5 +131,38 @@ describe("resolveChatAuth", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     vi.stubEnv("EASYMODE_ACCESS_TOKEN", TOKEN);
     expect(resolveChatAuth(ipReq("10.9.0.4")).denied?.status).toBe(400);
+  });
+});
+
+describe("doorState", () => {
+  const at = (headers: Record<string, string> = {}) => req("https://app.example.com/", headers);
+  it("is open when there is no server key (BYOK), regardless of token/host", () => {
+    expect(doorState(at(), { hasServerKey: false, nodeEnv: "production", token: TOKEN })).toBe(
+      "open",
+    );
+    expect(doorState(at(), { hasServerKey: false, nodeEnv: "production" })).toBe("open");
+  });
+  it("locks when a server key exists in token mode without credentials", () => {
+    expect(doorState(at(), { hasServerKey: true, token: TOKEN, nodeEnv: "production" })).toBe(
+      "locked",
+    );
+  });
+  it("opens in token mode with a valid bearer", () => {
+    expect(
+      doorState(at({ authorization: `Bearer ${TOKEN}` }), {
+        hasServerKey: true,
+        token: TOKEN,
+        nodeEnv: "production",
+      }),
+    ).toBe("open");
+  });
+  it("is closed when a server key exists in production with no token", () => {
+    expect(doorState(at(), { hasServerKey: true, nodeEnv: "production" })).toBe("closed");
+  });
+  it("opens for loopback in dev with a server key and no token", () => {
+    expect(
+      doorState(req("http://localhost/"), { hasServerKey: true, nodeEnv: "development" }),
+    ).toBe("open");
+    expect(doorState(at(), { hasServerKey: true, nodeEnv: "development" })).toBe("locked");
   });
 });

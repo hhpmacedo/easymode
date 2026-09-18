@@ -24,18 +24,41 @@ export const MIN_TOKEN_LENGTH = 16;
 
 export type AuthMode = "token" | "closed" | "open";
 
+/** Front-door verdict for the whole UI (the AccessGate):
+ *  - open: render the app (either BYOK, an authenticated session, or dev loopback)
+ *  - locked: show the access-token unlock form
+ *  - closed: misconfigured (server key set in prod but no token) */
+export type DoorState = "open" | "locked" | "closed";
+
 export interface AuthEnv {
   token?: string;
   nodeEnv?: string;
+  /** Whether the server has an ANTHROPIC_API_KEY worth protecting. */
+  hasServerKey?: boolean;
 }
 
 function envFromProcess(): AuthEnv {
-  return { token: process.env.EASYMODE_ACCESS_TOKEN, nodeEnv: process.env.NODE_ENV };
+  return {
+    token: process.env.EASYMODE_ACCESS_TOKEN,
+    nodeEnv: process.env.NODE_ENV,
+    hasServerKey: hasServerKey(),
+  };
 }
 
 export function authMode(env: AuthEnv = envFromProcess()): AuthMode {
   if (env.token && env.token.trim()) return "token";
   return env.nodeEnv === "production" ? "closed" : "open";
+}
+
+/** Whether the UI should let a visitor in. The access token guards the *server*
+ *  key; with no server key there is nothing to protect, so the door is open for
+ *  bring-your-own-key use (any host). */
+export function doorState(req: Request, env: AuthEnv = envFromProcess()): DoorState {
+  if (!env.hasServerKey) return "open";
+  const mode = authMode(env);
+  if (mode === "closed") return "closed";
+  if (mode === "open") return isLoopbackHost(req) ? "open" : "locked";
+  return isAuthenticated(req, env) ? "open" : "locked";
 }
 
 /** Session cookie value: a digest of the token, so a leaked cookie never shows
