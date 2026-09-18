@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { turnCosts, formatUSD } from "@/lib/costs";
+import { turnCosts, formatUSD, formatTokens } from "@/lib/costs";
 import { BASELINE_MODEL, PRICING } from "@/lib/pricing";
 import { SavingsBadge } from "./savings-badge";
 import type { EasyMetadata } from "@/lib/types";
@@ -67,6 +67,17 @@ export function OptimizationReveal({ meta, rawText }: { meta: EasyMetadata; rawT
           {costs && (
             <section>
               <Label>Cost — estimated</Label>
+              {usage && (
+                <p className="mb-2 text-[13px] text-ink-soft">
+                  Input {formatTokens(usage.inputTokens)} tokens
+                  {(usage.cacheReadTokens ?? 0) > 0 && (
+                    <> · {formatTokens(usage.cacheReadTokens ?? 0)} from cache</>
+                  )}
+                  {(usage.cacheWriteTokens ?? 0) > 0 && (
+                    <> · {formatTokens(usage.cacheWriteTokens ?? 0)} written to cache</>
+                  )}
+                </p>
+              )}
               <table className="w-full text-[13px]">
                 <tbody className="[&_td]:py-1">
                   <tr className="text-ink-soft">
