@@ -102,20 +102,24 @@ Sonnet 5, the workhorse tier).
 ```ts
 // lib/types.ts
 interface TokenUsage {
-  inputTokens: number;       // uncached input
+  inputTokens: number; // TOTAL input, cached included (AI SDK semantics;
+  //                      matches what stored conversations already hold)
   outputTokens: number;
-  cacheReadTokens: number;   // usage.inputTokenDetails.cacheReadTokens
-  cacheWriteTokens: number;  // usage.inputTokenDetails.cacheWriteTokens
+  cacheReadTokens?: number; // subset of inputTokens; usage.inputTokenDetails.cacheReadTokens
+  cacheWriteTokens?: number; // subset of inputTokens; usage.inputTokenDetails.cacheWriteTokens
 }
 ```
 
 `pricing.ts` gains `CACHE_READ_MULTIPLIER = 0.1` and
-`CACHE_WRITE_MULTIPLIER = 1.25` (5-minute TTL). `costOf` prices the four
-buckets separately. `turnCosts` keeps its current shape (`tier/amount/pct`).
-Stored conversations without cache fields read as zero.
+`CACHE_WRITE_MULTIPLIER = 1.25` (5-minute TTL). `costOf` prices
+`inputTokens − read − write` at full rate and the two cache buckets at their
+multipliers. `turnCosts` keeps its current shape (`tier/amount/pct`). Stored
+conversations without cache fields read as zero → unchanged cost.
 
-The reveal panel shows `cached: 38K of 41K input` per turn; finish metadata
-also carries `contextTokens` (total input) and `promptVersion`.
+The reveal panel shows `input 41K tokens · 38K from cache` per turn. The
+thread size the compaction threshold needs (§6.1) is simply
+`usage.inputTokens` of the last turn; no separate field. Finish metadata also
+carries `promptVersion` from step 2 onward.
 
 ### 3.2 Ratchet
 
@@ -257,8 +261,8 @@ inside chat and extract requests, and is included in the conversation export.
 
 ### 6.1 Threshold
 
-After each turn, `contextTokens` (uncached + cache read + cache write input)
-is the exact size of the thread. When it exceeds `settings.compactThreshold`
+After each turn, the answer call's `usage.inputTokens` (total input, cached
+included) is the exact size of the thread. When it exceeds `settings.compactThreshold`
 (default 60K; range 30K–200K) the client schedules a compaction **after** the
 assistant turn finishes — never before a send. A manual "Compact now" action
 lives in the conversation menu.
@@ -322,7 +326,7 @@ collapsed by default; expandable to the structured summary with Edit (sets
 Flow: auth → parse + caps (200 KB body cap stays; per-field caps added) →
 classify (with short memory, §4.5) → guardrail with ratchet →
 `assembleRequest` → `streamText({ system, messages, maxOutputTokens })` →
-metadata (`routing`, `classifierUsage` at start; `usage`, `contextTokens`,
+metadata (`routing`, `classifierUsage` at start; `usage` with cache fields and
 `promptVersion` at finish). The route no longer builds messages itself;
 `lib/history.ts` folds into `lib/context.ts`.
 
@@ -337,7 +341,7 @@ jobs independently of chat). Under BYOK all three endpoints bill the user's key.
 
 `useContextBundle(conversationId)` reads settings, memory and the
 conversation's compaction and supplies `body` to `DefaultChatTransport` at send
-time (like the key header today). After each finish, `contextTokens` feeds
+time (like the key header today). After each finish, `usage.inputTokens` feeds
 `useCompaction`; the quiet detector feeds `useMemoryExtraction`. Neither hook
 touches `useChat` state; they write to the store / conversation meta and the
 view re-reads via the existing `onMessagesChanged`.
