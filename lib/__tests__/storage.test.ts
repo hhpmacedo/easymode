@@ -91,3 +91,13 @@ describe("compaction meta", () => {
     expect(new ConversationStore(fakeStorage()).getMeta("nope")).toBeUndefined();
   });
 });
+
+describe("extractedThrough", () => {
+  it("records the last message memory extraction has read, without touching updatedAt", () => {
+    const store = new ConversationStore(fakeStorage());
+    const meta = store.create();
+    store.setExtractedThrough(meta.id, "m7");
+    expect(store.getMeta(meta.id)?.extractedThrough).toBe("m7");
+    expect(store.getMeta(meta.id)?.updatedAt).toBe(meta.updatedAt);
+  });
+});

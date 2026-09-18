@@ -14,9 +14,14 @@ export const COMPACT_THRESHOLD_MAX = 150_000;
 export interface Settings {
   instructions: string;
   compactThreshold: number;
+  memoryEnabled: boolean;
 }
 
-const DEFAULTS: Settings = { instructions: "", compactThreshold: COMPACT_THRESHOLD_DEFAULT };
+const DEFAULTS: Settings = {
+  instructions: "",
+  compactThreshold: COMPACT_THRESHOLD_DEFAULT,
+  memoryEnabled: true,
+};
 
 function normalize(value: unknown): Settings {
   const o = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -28,7 +33,9 @@ function normalize(value: unknown): Settings {
     typeof o.compactThreshold === "number" && Number.isFinite(o.compactThreshold)
       ? Math.min(COMPACT_THRESHOLD_MAX, Math.max(COMPACT_THRESHOLD_MIN, o.compactThreshold))
       : DEFAULTS.compactThreshold;
-  return { instructions, compactThreshold };
+  const memoryEnabled =
+    typeof o.memoryEnabled === "boolean" ? o.memoryEnabled : DEFAULTS.memoryEnabled;
+  return { instructions, compactThreshold, memoryEnabled };
 }
 
 /** Normalizes on read so a hand-edited or older value can never make the
@@ -68,6 +75,15 @@ export function setInstructions(instructions: string): void {
 export function setCompactThreshold(compactThreshold: number): void {
   try {
     writeSettings(window.localStorage, { ...getSettings(), compactThreshold });
+    window.dispatchEvent(new Event(SETTINGS_CHANGE_EVENT));
+  } catch {
+    // ignore, as above
+  }
+}
+
+export function setMemoryEnabled(memoryEnabled: boolean): void {
+  try {
+    writeSettings(window.localStorage, { ...getSettings(), memoryEnabled });
     window.dispatchEvent(new Event(SETTINGS_CHANGE_EVENT));
   } catch {
     // ignore, as above
