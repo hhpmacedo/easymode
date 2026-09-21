@@ -65,7 +65,8 @@ export function MessageList({
               Ask casually. We&rsquo;ll prompt precisely.
             </p>
             <p className="mt-2 text-sm text-muted">
-              Every message is rewritten and routed to the cheapest capable Claude model.
+              Every message is routed to the cheapest capable Claude model; longer ones are tuned
+              into a precise prompt first.
             </p>
             {needsKey && (
               <button

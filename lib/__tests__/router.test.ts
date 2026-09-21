@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGuardrail, atLeastTier } from "../router";
+import { applyGuardrail, atLeastTier, rewriteGuard } from "../router";
 
 const SHORT = "hello there friend"; // 3 words, no code
 const LONG = Array(320).fill("word").join(" "); // >300 words
@@ -85,5 +85,21 @@ describe("atLeastTier", () => {
     expect(atLeastTier("claude-haiku-4-5", "claude-opus-5")).toBe("claude-opus-5");
     expect(atLeastTier("claude-opus-5", "claude-haiku-4-5")).toBe("claude-opus-5");
     expect(atLeastTier("claude-sonnet-5")).toBe("claude-sonnet-5");
+  });
+});
+
+describe("rewriteGuard", () => {
+  it("returns the user's own words for messages under 15 words (spec §4.5)", () => {
+    expect(rewriteGuard("thanks, that worked", "Thank you; please confirm the fix worked.")).toBe(
+      "thanks, that worked",
+    );
+  });
+  it("keeps the rewrite for substantial messages", () => {
+    const long = Array(20).fill("word").join(" ");
+    expect(rewriteGuard(long, "REWRITTEN")).toBe("REWRITTEN");
+  });
+  it("falls back to the raw text when the rewrite is empty", () => {
+    const long = Array(20).fill("word").join(" ");
+    expect(rewriteGuard(long, "   ")).toBe(long);
   });
 });
