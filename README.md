@@ -21,10 +21,17 @@ guardrail bounds the choice. The chosen model streams the answer using the
 optimized prompt. Savings = always-Opus counterfactual (same output length)
 minus what we actually spent, router cost included.
 
+Every answer request is assembled in a fixed, stable-first order with two
+Anthropic prompt-cache breakpoints (end of the instruction layer; the latest
+user turn), and a thread never drops model tiers mid-conversation — the cache
+is per model. Cached input is priced at 10% (reads) / 125% (writes) in the
+cost estimate; the "how?" panel shows how much of each turn came from cache.
+
 ## Scripts
 
     npm test          # unit tests (guardrail, cost math, storage, history)
     npm run eval      # routing eval fixture vs live classifier (needs API key)
+    npm run eval:cache  # prompt-cache tripwire: turn two must read from cache (needs API key)
     npx playwright test  # e2e smoke (needs API key)
 
 ## Development

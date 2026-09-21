@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGuardrail } from "../router";
+import { applyGuardrail, atLeastTier } from "../router";
 
 const SHORT = "hello there friend"; // 3 words, no code
 const LONG = Array(320).fill("word").join(" "); // >300 words
@@ -51,6 +51,21 @@ describe("applyGuardrail", () => {
       "claude-sonnet-5",
     );
   });
+  it("ratchets: never drops below the prior tier, whatever the classifier says (spec §3.2)", () => {
+    // Trivial follow-up after an Opus task stays on Opus — the cached thread is per model.
+    expect(applyGuardrail("claude-haiku-4-5", "trivial", "ok thanks", "claude-opus-5")).toEqual({
+      model: "claude-opus-5",
+      applied: true,
+    });
+    // Everyday follow-up after a Fable task stays on Fable.
+    expect(applyGuardrail("claude-sonnet-5", "everyday", MID20, "claude-fable-5-1").model).toBe(
+      "claude-fable-5-1",
+    );
+    // Legacy prior ids rank the same as their successors.
+    expect(
+      applyGuardrail("claude-haiku-4-5", "trivial", "ok thanks", "claude-opus-4-8").model,
+    ).toBe("claude-opus-4-8");
+  });
   it("leaves valid choices untouched", () => {
     expect(
       applyGuardrail(
@@ -62,5 +77,13 @@ describe("applyGuardrail", () => {
       model: "claude-sonnet-5",
       applied: false,
     });
+  });
+});
+
+describe("atLeastTier", () => {
+  it("returns the prior tier when it outranks the model, else the model", () => {
+    expect(atLeastTier("claude-haiku-4-5", "claude-opus-5")).toBe("claude-opus-5");
+    expect(atLeastTier("claude-opus-5", "claude-haiku-4-5")).toBe("claude-opus-5");
+    expect(atLeastTier("claude-sonnet-5")).toBe("claude-sonnet-5");
   });
 });

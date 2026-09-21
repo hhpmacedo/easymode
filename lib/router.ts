@@ -15,6 +15,13 @@ const RANK: Record<ModelId, number> = {
   "claude-fable-5": 3, // legacy, same tier as Fable 5.1
 };
 
+/** Ratchet: within a conversation the tier never goes down (spec §3.2). The
+ *  prompt cache is per model, so a downgrade would forfeit the cached thread
+ *  and usually cost more than it saves. */
+export function atLeastTier(model: ModelId, prior?: ModelId): ModelId {
+  return prior && RANK[model] < RANK[prior] ? prior : model;
+}
+
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -25,7 +32,8 @@ function hasCode(text: string): boolean {
 
 /** Deterministic post-LLM guardrail. Pure; unit-tested. Only moves the choice
  *  within the pool — never invents a model. `priorModel` is the tier of the
- *  turn this message continues (follow-up inheritance, acceptance criterion 3). */
+ *  turn this message continues: a follow-up inherits at least that tier
+ *  (acceptance criterion 3) and, since caching landed, never drops below it. */
 export function applyGuardrail(
   chosen: ModelId,
   complexity: Complexity,
@@ -52,6 +60,8 @@ export function applyGuardrail(
   if (RANK[model] === 3 && !(complexity === "exceptional" && words > 50)) {
     model = "claude-opus-5";
   }
+  // Ratchet last, so it wins over the cap and the Fable gate.
+  model = atLeastTier(model, priorModel);
   return { model, applied: model !== chosen };
 }
 

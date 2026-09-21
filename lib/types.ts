@@ -14,9 +14,15 @@ export type ModelId = (typeof MODEL_IDS)[number];
 export const COMPLEXITIES = ["trivial", "everyday", "hard", "exceptional"] as const;
 export type Complexity = (typeof COMPLEXITIES)[number];
 
+/** Token counts for one model call. `inputTokens` is the TOTAL input (cached
+ *  included — AI SDK semantics, and what stored conversations already hold);
+ *  the cache fields are subsets of it. Absent on turns stored before caching
+ *  existed, which read as zero. */
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 export interface RoutingDecision {
