@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGuardrail, atLeastTier, rewriteGuard } from "../router";
+import { applyGuardrail, atLeastTier, buildClassifierPrompt, rewriteGuard } from "../router";
 
 const SHORT = "hello there friend"; // 3 words, no code
 const LONG = Array(320).fill("word").join(" "); // >300 words
@@ -101,5 +101,22 @@ describe("rewriteGuard", () => {
   it("falls back to the raw text when the rewrite is empty", () => {
     const long = Array(20).fill("word").join(" ");
     expect(rewriteGuard(long, "   ")).toBe(long);
+  });
+});
+
+describe("buildClassifierPrompt with memory", () => {
+  it("prefixes short memory lines so routing can use standing preferences", () => {
+    const p = buildClassifierPrompt([], "hi", ["Prefers concise answers", "Works in Rust"]);
+    expect(p.startsWith("About the user:\n- Prefers concise answers\n- Works in Rust\n\n")).toBe(
+      true,
+    );
+    expect(p.endsWith("NEW USER MESSAGE:\nhi")).toBe(true);
+  });
+  it("omits memory entirely when it is long (spec §4.5)", () => {
+    const long = Array(40).fill("x".repeat(60));
+    expect(buildClassifierPrompt([], "hi", long)).toBe("NEW USER MESSAGE:\nhi");
+  });
+  it("is unchanged without memory", () => {
+    expect(buildClassifierPrompt([], "hi")).toBe("NEW USER MESSAGE:\nhi");
   });
 });

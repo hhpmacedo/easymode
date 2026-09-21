@@ -60,6 +60,23 @@ export interface Compaction {
   edited: boolean;
 }
 
+export const MEMORY_KINDS = ["profile", "preference", "project", "fact"] as const;
+export type MemoryKind = (typeof MEMORY_KINDS)[number];
+
+/** One durable fact about the user (spec §5.1). One line, ≤ 200 chars.
+ *  Archived memories stay stored (for undo and audit) but are never sent. */
+export interface Memory {
+  id: string;
+  text: string;
+  kind: MemoryKind;
+  source: "user" | "extracted";
+  /** Where it was learned (absent for `remember:` and edits). */
+  conversationId?: string;
+  createdAt: number;
+  updatedAt: number;
+  status: "active" | "archived";
+}
+
 /** Per-request context the client sends with the messages (spec §7.1).
  *  Local-first: the browser owns instructions; the server only validates. */
 export interface ChatContext {
@@ -68,6 +85,8 @@ export interface ChatContext {
   promptVersion?: string;
   /** The conversation's compaction, if any: what to drop and what to say instead. */
   compaction?: Pick<Compaction, "throughMessageId" | "summary">;
+  /** Active memory lines, already capped by the client (spec §4.3). */
+  memory?: string[];
 }
 
 /** Metadata attached to each assistant UI message. `routing`+`classifierUsage`
