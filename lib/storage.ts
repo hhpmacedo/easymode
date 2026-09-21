@@ -1,11 +1,15 @@
 import { messageText } from "./types";
-import type { EasyUIMessage } from "./types";
+import type { Compaction, EasyUIMessage } from "./types";
 
 export interface ConversationMeta {
   id: string;
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** Spec §6.3: the latest compaction; older turns stay stored for display. */
+  compaction?: Compaction;
+  /** Spec §5.2: the last message id memory extraction has read. */
+  extractedThrough?: string;
 }
 
 const INDEX_KEY = "easymode:index";
@@ -78,6 +82,31 @@ export class ConversationStore {
     const meta = index.find((c) => c.id === id);
     if (!meta) return;
     meta.title = title;
+    this.writeIndex(index);
+  }
+
+  getMeta(id: string): ConversationMeta | undefined {
+    return this.readIndex().find((c) => c.id === id);
+  }
+
+  /** Set or clear a conversation's compaction. Deliberately does not bump
+   *  updatedAt: compaction is bookkeeping, not activity, so the sidebar
+   *  order stays put. */
+  setCompaction(id: string, compaction: Compaction | undefined): void {
+    const index = this.readIndex();
+    const meta = index.find((c) => c.id === id);
+    if (!meta) return;
+    if (compaction) meta.compaction = compaction;
+    else delete meta.compaction;
+    this.writeIndex(index);
+  }
+
+  /** Bookkeeping like setCompaction: never bumps updatedAt. */
+  setExtractedThrough(id: string, messageId: string): void {
+    const index = this.readIndex();
+    const meta = index.find((c) => c.id === id);
+    if (!meta) return;
+    meta.extractedThrough = messageId;
     this.writeIndex(index);
   }
 

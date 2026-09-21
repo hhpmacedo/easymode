@@ -36,12 +36,57 @@ export interface RoutingDecision {
   fallback: boolean; // true when classifier failed and we defaulted
 }
 
+/** Structured summary of compacted history (spec §6.2). Structured beats
+ *  prose: more faithful for the model, scannable for the user. */
+export interface CompactionSummary {
+  goal: string;
+  decisions: string[];
+  facts: string[];
+  artifacts: string[];
+  open: string[];
+}
+
+/** A conversation's current compaction (spec §6.3). Turns up to and including
+ *  `throughMessageId` stay in storage for display but are no longer sent to
+ *  the model; the summary is sent in their place. Only the latest is kept —
+ *  a re-compaction folds the previous summary in. */
+export interface Compaction {
+  throughMessageId: string;
+  summary: CompactionSummary;
+  /** Context size (usage.inputTokens) of the turn that triggered it. */
+  tokensBefore: number;
+  createdAt: number;
+  /** The user edited the summary; a later compaction must preserve their edits. */
+  edited: boolean;
+}
+
+export const MEMORY_KINDS = ["profile", "preference", "project", "fact"] as const;
+export type MemoryKind = (typeof MEMORY_KINDS)[number];
+
+/** One durable fact about the user (spec §5.1). One line, ≤ 200 chars.
+ *  Archived memories stay stored (for undo and audit) but are never sent. */
+export interface Memory {
+  id: string;
+  text: string;
+  kind: MemoryKind;
+  source: "user" | "extracted";
+  /** Where it was learned (absent for `remember:` and edits). */
+  conversationId?: string;
+  createdAt: number;
+  updatedAt: number;
+  status: "active" | "archived";
+}
+
 /** Per-request context the client sends with the messages (spec §7.1).
  *  Local-first: the browser owns instructions; the server only validates. */
 export interface ChatContext {
   instructions?: string;
   /** The PROMPT_VERSION the client was built against; the server logs a mismatch. */
   promptVersion?: string;
+  /** The conversation's compaction, if any: what to drop and what to say instead. */
+  compaction?: Pick<Compaction, "throughMessageId" | "summary">;
+  /** Active memory lines, already capped by the client (spec §4.3). */
+  memory?: string[];
 }
 
 /** Metadata attached to each assistant UI message. `routing`+`classifierUsage`

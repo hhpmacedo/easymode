@@ -278,7 +278,7 @@ inside chat and extract requests, and is included in the conversation export.
 
 After each turn, the answer call's `usage.inputTokens` (total input, cached
 included) is the exact size of the thread. When it exceeds `settings.compactThreshold`
-(default 60K; range 30K–200K) the client schedules a compaction **after** the
+(default 60K; range 30K–150K, so the compaction input fits the Haiku 4.5 window) the client schedules a compaction **after** the
 assistant turn finishes — never before a send. A manual "Compact now" action
 lives in the conversation menu.
 
@@ -338,12 +338,15 @@ collapsed by default; expandable to the structured summary with Edit (sets
              promptVersion?: string } }       // server logs a mismatch
 ```
 
-Flow: auth → parse + caps (200 KB body cap stays; per-field caps added) →
+Flow: auth → parse + caps (body cap is 2 MB / 1,000 messages so one compaction
+cycle's worth of thread fits; the client sends only the turns from the boundary
+onward; per-field caps added) →
 classify (with short memory, §4.5) → guardrail with ratchet →
 `assembleRequest` → `streamText({ system, messages, maxOutputTokens })` →
 metadata (`routing`, `classifierUsage` at start; `usage` with cache fields and
 `promptVersion` at finish). The route no longer builds messages itself;
-`lib/history.ts` folds into `lib/context.ts`.
+`lib/history.ts` stays; `assembleRequest` slices the thread at the boundary
+before calling it.
 
 ### 7.2 `POST /api/memory/extract`, `POST /api/compact`
 
@@ -370,7 +373,7 @@ bounded by the existing token gate and body caps.
 ## 8. Storage and settings
 
 - `easymode:settings` → `{ instructions: string; compactThreshold: number; memoryEnabled: boolean }`
-- `easymode:memory` → `Memory[]`
+- `easymode:memory` → `{ memories: Memory[], costs: Record<"YYYY-MM", number> }` (memories plus the extraction cost ledger)
 - `ConversationMeta` += `compaction?`, `extractedThrough?`
 - Typed accessors on `ConversationStore`; export includes memory + settings.
 

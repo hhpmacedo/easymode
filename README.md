@@ -34,11 +34,28 @@ they cost almost nothing per turn. Instructions live in your browser only.
 Messages under 15 words are sent exactly as written; longer ones are tuned into a
 precise prompt first.
 
+Long conversations are compacted: when the context passes the threshold in
+**Settings → Context** (default 60K tokens), the older turns are summarized in
+the background into a structured note — goal, decisions, facts, artifacts, open
+threads — that the model reads instead of those turns. The note appears in the
+thread where the cut was made; open it to read or edit it. The header shows the
+estimated context size your next message will carry, and lets you compact now.
+
+EasyMode remembers durable facts about you — role, tools, preferences, ongoing
+projects — extracted by a small background call when a conversation goes quiet,
+and saved with an undo ("Remembered: … · Undo"). Type `remember: …` to add one
+directly. Everything lives under **Settings → Memory** (edit, forget, clear,
+switch off) in your browser only; active memories ride at the start of every
+request's cached prefix inside `<memory>`. Sensitive topics are excluded unless
+you explicitly ask to remember them.
+
 ## Scripts
 
     npm test          # unit tests (guardrail, cost math, storage, history)
     npm run eval      # routing eval fixture vs live classifier (needs API key)
     npm run eval:cache  # prompt-cache tripwire: turn two must read from cache (needs API key)
+    npm run eval:compact  # compaction keeps the facts it must (needs API key)
+    npm run eval:memory   # extraction keeps the right facts and drops sensitive ones (needs API key)
     npx playwright test  # e2e smoke (needs API key)
 
 ## Development

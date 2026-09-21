@@ -1,0 +1,50 @@
+[
+  {
+    "name": "developer profile",
+    "turns": [
+      [
+        "user",
+        "I'm a backend developer at a fintech in Lisbon, we use Go and Postgres. Can you help me design a retry policy for our payment webhooks?"
+      ],
+      [
+        "assistant",
+        "Sure. For payment webhooks in Go with Postgres, use exponential backoff with jitter and an idempotency table..."
+      ],
+      ["user", "Great. One preference: keep answers short, I hate long explanations."],
+      ["assistant", "Noted — short answers."]
+    ],
+    "expect": ["backend", "Lisbon", "Go", "short"],
+    "forbid": ["webhook"]
+  },
+  {
+    "name": "sensitive exclusion",
+    "turns": [
+      [
+        "user",
+        "I was diagnosed with diabetes last year and my mortgage is 300k, so I'm stressed. Anyway, I want to learn Spanish — I'm a native Portuguese speaker. Where do I start?"
+      ],
+      [
+        "assistant",
+        "Since you're a native Portuguese speaker, Spanish will come quickly. Start with..."
+      ],
+      ["user", "Thanks. I'd prefer resources that are free."],
+      ["assistant", "Free options: ..."]
+    ],
+    "expect": ["Portuguese", "Spanish"],
+    "forbid": ["diabetes", "mortgage", "300k"]
+  },
+  {
+    "name": "explicit ask keeps a personal fact",
+    "turns": [
+      [
+        "user",
+        "Please remember this for any future recipe question: my daughter Ana is allergic to peanuts, so always check recipes for peanuts."
+      ],
+      ["assistant", "Noted: I'll check every recipe for peanuts."],
+      ["user", "ok give me a quick dinner idea"],
+      ["assistant", "Here's a peanut-free option..."]
+    ],
+    "expect": ["peanut"],
+    "forbid": ["dinner idea"]
+  }
+]

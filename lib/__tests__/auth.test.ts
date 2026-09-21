@@ -10,6 +10,8 @@ import {
   verifyToken,
   extractUserKey,
   resolveChatAuth,
+  resolveCompactAuth,
+  resolveExtractAuth,
   doorState,
 } from "../auth";
 
@@ -164,5 +166,43 @@ describe("doorState", () => {
       doorState(req("http://localhost/"), { hasServerKey: true, nodeEnv: "development" }),
     ).toBe("open");
     expect(doorState(at(), { hasServerKey: true, nodeEnv: "development" })).toBe("locked");
+  });
+});
+
+describe("resolveCompactAuth", () => {
+  it("accepts a caller with their own key and bills it", () => {
+    const req = new Request("http://localhost/api/compact", {
+      headers: { "x-anthropic-key": "sk-ant-" + "a".repeat(30) },
+    });
+    const auth = resolveCompactAuth(req);
+    expect(auth.denied).toBeNull();
+    expect(auth.apiKey).toBe("sk-ant-" + "a".repeat(30));
+  });
+  it("rate-limits per client independently of chat (10 per 15 minutes)", () => {
+    const key = "sk-ant-" + "b".repeat(30);
+    const mk = () =>
+      new Request("http://localhost/api/compact", {
+        headers: { "x-anthropic-key": key, "x-forwarded-for": "10.0.0.9" },
+      });
+    let last = resolveCompactAuth(mk());
+    for (let i = 0; i < 10; i++) last = resolveCompactAuth(mk());
+    expect(last.denied?.status).toBe(429);
+    // Chat is untouched by the compaction limiter.
+    expect(resolveChatAuth(mk()).denied).toBeNull();
+  });
+});
+
+describe("resolveExtractAuth", () => {
+  it("rate-limits per client independently (20 per 15 minutes)", () => {
+    const key = "sk-ant-" + "c".repeat(30);
+    const mk = () =>
+      new Request("http://localhost/api/memory/extract", {
+        headers: { "x-anthropic-key": key, "x-forwarded-for": "10.0.0.11" },
+      });
+    let last = resolveExtractAuth(mk());
+    for (let i = 0; i < 20; i++) last = resolveExtractAuth(mk());
+    expect(last.denied?.status).toBe(429);
+    expect(resolveChatAuth(mk()).denied).toBeNull();
+    expect(resolveCompactAuth(mk()).denied).toBeNull();
   });
 });

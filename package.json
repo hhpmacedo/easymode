@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "eval": "tsx scripts/run-eval.ts",
     "eval:cache": "tsx scripts/check-cache.ts",
+    "eval:compact": "tsx scripts/check-compaction.ts",
+    "eval:memory": "tsx scripts/check-memory.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
